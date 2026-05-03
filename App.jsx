@@ -128,33 +128,24 @@ const statusColor = (s) => {
   return m[s] || "bg-slate-500/20 text-slate-400";
 };
 
-// ── PERSISTENT STORAGE HOOK ──────────────────────────────────────────────────
+// ── PERSISTENT STORAGE HOOK (localStorage — works on GitHub Pages) ────────────
 const usePersistedState = (storageKey, initialValue) => {
-  const [state, setState] = useState(initialValue);
-  const [loaded, setLoaded] = useState(false);
+  const [state, setState] = useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
 
-  // Load from storage on mount
   useEffect(() => {
-    (async () => {
-      try {
-        const result = await window.storage.get(storageKey);
-        if (result?.value) setState(JSON.parse(result.value));
-      } catch {}
-      setLoaded(true);
-    })();
-  }, [storageKey]);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {}
+  }, [state, storageKey]);
 
-  // Save to storage whenever state changes (after initial load)
-  useEffect(() => {
-    if (!loaded) return;
-    (async () => {
-      try {
-        await window.storage.set(storageKey, JSON.stringify(state));
-      } catch {}
-    })();
-  }, [state, loaded, storageKey]);
-
-  return [state, setState, loaded];
+  return [state, setState, true]; // always "loaded" since localStorage is sync
 };
 
 
@@ -358,7 +349,7 @@ const PoliciesPage = ({ t, data, setData }) => {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(null); // null | "add" | policy obj
-  const [form, setForm] = useState({ client:"", type:"Health", premium:"", status:"Active", expiry:"", risk:"Low" });
+  const [form, setForm] = useState({ client:"", type:"Health", premium:"", status:"Active", expiry:"", risk:"Low", docLink:"" });
 
   const [statusF, setStatusF] = useState("All");
   const [riskF, setRiskF] = useState("All");
@@ -371,8 +362,8 @@ const PoliciesPage = ({ t, data, setData }) => {
     (search===""||p.client.toLowerCase().includes(search.toLowerCase())||p.id.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const openAdd = () => { setForm({ client:"", type:"Health", premium:"", status:"Active", expiry:"", risk:"Low" }); setModal("add"); };
-  const openEdit = (p) => { setForm({...p, premium:String(p.premium)}); setModal(p); };
+  const openAdd = () => { setForm({ client:"", type:"Health", premium:"", status:"Active", expiry:"", risk:"Low", docLink:"" }); setModal("add"); };
+  const openEdit = (p) => { setForm({...p, premium:String(p.premium), docLink:p.docLink||"" }); setModal(p); };
   const save = () => {
     if (!form.client||!form.premium||!form.expiry) return;
     if (modal==="add") setData(d=>[...d,{...form, id:uid("POL"), premium:Number(form.premium)}]);
@@ -406,7 +397,7 @@ const PoliciesPage = ({ t, data, setData }) => {
           <button onClick={()=>exportCSV(filtered.map(p=>({...p})),"policies.csv")} style={{ fontSize:11, color:t.textMuted, background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer" }}>📤 CSV</button>
           <button onClick={()=>exportPDF("Policy Report",filtered,[{key:"id",label:"Policy ID"},{key:"client",label:"Client"},{key:"type",label:"Type"},{key:"premium",label:"Premium"},{key:"status",label:"Status"},{key:"expiry",label:"Expiry"},{key:"risk",label:"Risk"}])} style={{ fontSize:11, color:t.textMuted, background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer" }}>🖨️ PDF</button>
         </div>
-        <Table t={t} headers={["Policy ID","Client","Type","Premium","Status","Expiry","Days Left","Risk","Actions"]}
+        <Table t={t} headers={["Policy ID","Client","Type","Premium","Status","Expiry","Days Left","Risk","Doc","Actions"]}
           rows={filtered.map(p=>{
             const d=daysUntil(p.expiry); const dc=d<15?"#f87171":d<45?"#f59e0b":"#34d399";
             return [
@@ -418,6 +409,12 @@ const PoliciesPage = ({ t, data, setData }) => {
               <span style={{ color:t.textMuted, fontSize:11 }}>{p.expiry}</span>,
               <span style={{ color:dc, fontWeight:700, fontSize:11 }}>{d<0?"Expired":`${d}d`}</span>,
               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${p.risk==="Low"?"text-emerald-400 bg-emerald-500/10":p.risk==="Medium"?"text-amber-400 bg-amber-500/10":"text-red-400 bg-red-500/10"}`}>{p.risk}</span>,
+              p.docLink
+                ? <a href={p.docLink} target="_blank" rel="noopener noreferrer"
+                    style={{ display:"inline-flex", alignItems:"center", gap:4, background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.35)", borderRadius:7, padding:"3px 9px", fontSize:11, color:"#60a5fa", textDecoration:"none", fontWeight:600, whiteSpace:"nowrap" }}>
+                    📄 View
+                  </a>
+                : <span style={{ fontSize:11, color:t.textMuted, opacity:0.4 }}>—</span>,
               <div style={{ display:"flex", gap:6 }}>
                 <button onClick={()=>openEdit(p)} style={{ fontSize:11, padding:"3px 8px", background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:6, color:"#60a5fa", cursor:"pointer" }}>✏️ Edit</button>
                 <button onClick={()=>del(p.id)} style={{ fontSize:11, padding:"3px 8px", background:"rgba(248,113,113,0.15)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:6, color:"#f87171", cursor:"pointer" }}>🗑️</button>
@@ -434,6 +431,20 @@ const PoliciesPage = ({ t, data, setData }) => {
           <Field label="Status" value={form.status} onChange={v=>f({status:v})} options={["Active","Renewal Due","Lapsed"]} t={t}/>
           <Field label="Expiry Date" value={form.expiry} onChange={v=>f({expiry:v})} type="date" t={t} required/>
           <Field label="Risk Level" value={form.risk} onChange={v=>f({risk:v})} options={["Low","Medium","High"]} t={t}/>
+          <div style={{ marginBottom:14 }}>
+            <label style={{ display:"block", fontSize:11, fontWeight:600, color:t.textMuted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.05em" }}>Policy Document Link (URL)</label>
+            <div style={{ display:"flex", gap:8 }}>
+              <input value={form.docLink||""} onChange={e=>f({docLink:e.target.value})} placeholder="https://drive.google.com/... ya koi bhi link"
+                style={{ flex:1, background:t.input, border:`1px solid ${form.docLink?"rgba(96,165,250,0.5)":t.inputBorder}`, borderRadius:10, padding:"9px 12px", fontSize:13, color:t.text, outline:"none" }}/>
+              {form.docLink && (
+                <a href={form.docLink} target="_blank" rel="noopener noreferrer"
+                  style={{ background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:10, padding:"9px 14px", color:"#60a5fa", fontSize:12, fontWeight:700, textDecoration:"none", whiteSpace:"nowrap", display:"flex", alignItems:"center" }}>
+                  📄 Test
+                </a>
+              )}
+            </div>
+            <p style={{ fontSize:10, color:t.textMuted, marginTop:4 }}>Google Drive, OneDrive, Dropbox, ya koi bhi public link</p>
+          </div>
           <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
             <Btn onClick={()=>setModal(null)} outline color={t.textMuted} t={t}>Cancel</Btn>
             <Btn onClick={save} t={t}>{modal==="add"?"Add Policy":"Save Changes"}</Btn>
@@ -1281,7 +1292,7 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
 
   // ── COLUMN DEFINITIONS per data type ──
   const SCHEMA = {
-    policies:  { required:["client","type","premium","status","expiry","risk"],  labels:{ client:"Client Name", type:"Insurance Type (Health/Life/Car/Home)", premium:"Annual Premium (₹)", status:"Status (Active/Renewal Due/Lapsed)", expiry:"Expiry Date (YYYY-MM-DD)", risk:"Risk Level (Low/Medium/High)" } },
+    policies:  { required:["client","type","premium","status","expiry","risk","docLink"],  labels:{ client:"Client Name", type:"Insurance Type (Health/Life/Car/Home)", premium:"Annual Premium (₹)", status:"Status (Active/Renewal Due/Lapsed)", expiry:"Expiry Date (YYYY-MM-DD)", risk:"Risk Level (Low/Medium/High)", docLink:"Policy Document Link (URL) — Optional" } },
     clients:   { required:["name","email","phone","city","policies","totalPremium","since"], labels:{ name:"Client Name", email:"Email", phone:"Phone", city:"City", policies:"No. of Policies", totalPremium:"Total Premium (₹)", since:"Member Since (Year)" } },
     claims:    { required:["client","type","amount","filed","status","agent"],   labels:{ client:"Client Name", type:"Type (Health/Life/Car/Home)", amount:"Claim Amount (₹)", filed:"Filed Date (YYYY-MM-DD)", status:"Status (In Review/Approved/Rejected)", agent:"Assigned Agent" } },
     agents:    { required:["name","region","policiesSold","revenue","rating","target","commission"], labels:{ name:"Agent Name", region:"Region", policiesSold:"Policies Sold", revenue:"Revenue (Lakhs)", rating:"Rating (0-5)", target:"Monthly Target", commission:"Commission (₹)", claimsHandled:"Claims Handled" } },
@@ -1371,6 +1382,7 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
         else if (field === "status") val = normalizeStatus(val);
         else if (field === "expiry" || field === "filed" || field === "date") val = normalizeDate(val);
         else if (field === "risk") val = normalizeRisk(val);
+        else if (field === "docLink") val = String(val||"").trim(); // keep as URL string
         else if (field === "premium" || field === "amount" || field === "totalPremium" || field === "commission") val = Number(String(val).replace(/[₹,\s]/g,"")) || 0;
         else if (field === "policiesSold" || field === "policies" || field === "target" || field === "claimsHandled") val = Number(val) || 0;
         else if (field === "revenue" || field === "rating") val = parseFloat(val) || 0;
@@ -1441,7 +1453,7 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
         rating: ["rating","score","stars"],
         target: ["target","goal","monthly target"],
         commission:["commission","brokerage","earning","incentive"],
-        method: ["method","mode","payment mode","pay mode","channel"],
+        docLink:["policy link","document link","doc link","link","url","policy url","document url","policy document","doc url","file link","download link","policy copy","soft copy","pdf link"],
         date:   ["date","payment date","paid on","transaction date"],
       };
       Object.keys(SCHEMA[SCHEMA_TYPE].labels).forEach(field => {
