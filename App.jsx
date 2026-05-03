@@ -56,14 +56,14 @@ const regionData = [
   { name:"Rajasthan", policies:241, revenue:8.1, color:"#4ade80" },
 ];
 const INIT_POLICIES = [
-  { id:"POL-1042", policyNo:"", client:"Rahul Sharma", contact:"9876543210", type:"Health", department:"MEDICLAIM", effectiveDate:"2026-01-15", expiry:"2026-06-15", netPremium:15678, gst:2822, premium:18500, commisionable:15678, income:8.5, status:"Active", risk:"Low", docLink:"", year:"2026", month:"Jan" },
-  { id:"POL-1043", policyNo:"", client:"Priya Mehta", contact:"8765432109", type:"Life", department:"LIFE", effectiveDate:"2024-07-22", expiry:"2035-07-22", netPremium:27119, gst:4881, premium:32000, commisionable:27119, income:12, status:"Active", risk:"Low", docLink:"", year:"2024", month:"Jul" },
-  { id:"POL-1044", policyNo:"", client:"Arjun Singh", contact:"7654321098", type:"Car", department:"PVT CAR", effectiveDate:"2025-05-10", expiry:"2026-05-10", netPremium:7797, gst:1403, premium:9200, commisionable:7797, income:6, status:"Renewal Due", risk:"Medium", docLink:"", year:"2025", month:"May" },
-  { id:"POL-1045", policyNo:"", client:"Sneha Kapoor", contact:"6543210987", type:"Home", department:"FIRE", effectiveDate:"2026-01-30", expiry:"2027-01-30", netPremium:11864, gst:2136, premium:14000, commisionable:11864, income:5, status:"Active", risk:"Low", docLink:"", year:"2026", month:"Jan" },
-  { id:"POL-1046", policyNo:"", client:"Vikram Nair", contact:"5432109876", type:"Health", department:"MEDICLAIM", effectiveDate:"2024-12-01", expiry:"2025-12-01", netPremium:18644, gst:3356, premium:22000, commisionable:18644, income:9, status:"Lapsed", risk:"High", docLink:"", year:"2024", month:"Dec" },
-  { id:"POL-1047", policyNo:"", client:"Ananya Reddy", contact:"4321098765", type:"Life", department:"LIFE", effectiveDate:"2023-09-14", expiry:"2038-09-14", netPremium:24153, gst:4347, premium:28500, commisionable:24153, income:14, status:"Active", risk:"Low", docLink:"", year:"2023", month:"Sep" },
-  { id:"POL-1048", policyNo:"", client:"Karan Joshi", contact:"3210987654", type:"Car", department:"PVT CAR", effectiveDate:"2025-08-25", expiry:"2026-08-25", netPremium:9661, gst:1739, premium:11400, commisionable:9661, income:7, status:"Active", risk:"Medium", docLink:"", year:"2025", month:"Aug" },
-  { id:"POL-1049", policyNo:"", client:"Divya Patel", contact:"2109876543", type:"Home", department:"FIRE", effectiveDate:"2025-05-20", expiry:"2026-05-20", netPremium:14237, gst:2563, premium:16800, commisionable:14237, income:5.5, status:"Renewal Due", risk:"Medium", docLink:"", year:"2025", month:"May" },
+  { id:"POL-1042", client:"Rahul Sharma", type:"Health", premium:18500, status:"Active", expiry:"2026-06-15", risk:"Low" },
+  { id:"POL-1043", client:"Priya Mehta", type:"Life", premium:32000, status:"Active", expiry:"2035-07-22", risk:"Low" },
+  { id:"POL-1044", client:"Arjun Singh", type:"Car", premium:9200, status:"Renewal Due", expiry:"2026-05-10", risk:"Medium" },
+  { id:"POL-1045", client:"Sneha Kapoor", type:"Home", premium:14000, status:"Active", expiry:"2027-01-30", risk:"Low" },
+  { id:"POL-1046", client:"Vikram Nair", type:"Health", premium:22000, status:"Lapsed", expiry:"2025-12-01", risk:"High" },
+  { id:"POL-1047", client:"Ananya Reddy", type:"Life", premium:28500, status:"Active", expiry:"2038-09-14", risk:"Low" },
+  { id:"POL-1048", client:"Karan Joshi", type:"Car", premium:11400, status:"Active", expiry:"2026-08-25", risk:"Medium" },
+  { id:"POL-1049", client:"Divya Patel", type:"Home", premium:16800, status:"Renewal Due", expiry:"2026-05-20", risk:"Medium" },
 ];
 const INIT_CLIENTS = [
   { id:"C-201", name:"Rahul Sharma", email:"rahul@email.com", phone:"+91 98765 43210", policies:2, totalPremium:40500, since:"2021", city:"Mumbai" },
@@ -128,24 +128,33 @@ const statusColor = (s) => {
   return m[s] || "bg-slate-500/20 text-slate-400";
 };
 
-// ── PERSISTENT STORAGE HOOK (localStorage — works on GitHub Pages) ────────────
+// ── PERSISTENT STORAGE HOOK ──────────────────────────────────────────────────
 const usePersistedState = (storageKey, initialValue) => {
-  const [state, setState] = useState(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      return saved ? JSON.parse(saved) : initialValue;
-    } catch {
-      return initialValue;
-    }
-  });
+  const [state, setState] = useState(initialValue);
+  const [loaded, setLoaded] = useState(false);
 
+  // Load from storage on mount
   useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(state));
-    } catch {}
-  }, [state, storageKey]);
+    (async () => {
+      try {
+        const result = await window.storage.get(storageKey);
+        if (result?.value) setState(JSON.parse(result.value));
+      } catch {}
+      setLoaded(true);
+    })();
+  }, [storageKey]);
 
-  return [state, setState, true]; // always "loaded" since localStorage is sync
+  // Save to storage whenever state changes (after initial load)
+  useEffect(() => {
+    if (!loaded) return;
+    (async () => {
+      try {
+        await window.storage.set(storageKey, JSON.stringify(state));
+      } catch {}
+    })();
+  }, [state, loaded, storageKey]);
+
+  return [state, setState, loaded];
 };
 
 
@@ -349,7 +358,7 @@ const PoliciesPage = ({ t, data, setData }) => {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(null); // null | "add" | policy obj
-  const [form, setForm] = useState({ policyNo:"", client:"", contact:"", department:"", type:"Health", effectiveDate:"", expiry:"", netPremium:"", gst:"", premium:"", commisionable:"", income:"", status:"Active", risk:"Low", docLink:"" });
+  const [form, setForm] = useState({ client:"", type:"Health", premium:"", status:"Active", expiry:"", risk:"Low" });
 
   const [statusF, setStatusF] = useState("All");
   const [riskF, setRiskF] = useState("All");
@@ -359,13 +368,11 @@ const PoliciesPage = ({ t, data, setData }) => {
     (filter==="All"||p.type===filter)&&
     (statusF==="All"||p.status===statusF)&&
     (riskF==="All"||p.risk===riskF)&&
-    (search===""||p.client.toLowerCase().includes(search.toLowerCase())||
-     (p.policyNo||"").toLowerCase().includes(search.toLowerCase())||
-     (p.contact||"").includes(search))
+    (search===""||p.client.toLowerCase().includes(search.toLowerCase())||p.id.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const openAdd = () => { setForm({ policyNo:"", client:"", contact:"", department:"", type:"Health", effectiveDate:"", expiry:"", netPremium:"", gst:"", premium:"", commisionable:"", income:"", status:"Active", risk:"Low", docLink:"" }); setModal("add"); };
-  const openEdit = (p) => { setForm({...p, premium:String(p.premium||""), netPremium:String(p.netPremium||""), gst:String(p.gst||""), income:String(p.income||""), docLink:p.docLink||"" }); setModal(p); };
+  const openAdd = () => { setForm({ client:"", type:"Health", premium:"", status:"Active", expiry:"", risk:"Low" }); setModal("add"); };
+  const openEdit = (p) => { setForm({...p, premium:String(p.premium)}); setModal(p); };
   const save = () => {
     if (!form.client||!form.premium||!form.expiry) return;
     if (modal==="add") setData(d=>[...d,{...form, id:uid("POL"), premium:Number(form.premium)}]);
@@ -399,32 +406,20 @@ const PoliciesPage = ({ t, data, setData }) => {
           <button onClick={()=>exportCSV(filtered.map(p=>({...p})),"policies.csv")} style={{ fontSize:11, color:t.textMuted, background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer" }}>📤 CSV</button>
           <button onClick={()=>exportPDF("Policy Report",filtered,[{key:"id",label:"Policy ID"},{key:"client",label:"Client"},{key:"type",label:"Type"},{key:"premium",label:"Premium"},{key:"status",label:"Status"},{key:"expiry",label:"Expiry"},{key:"risk",label:"Risk"}])} style={{ fontSize:11, color:t.textMuted, background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer" }}>🖨️ PDF</button>
         </div>
-        <Table t={t} headers={["Policy No.","Client","Contact","Dept.","Type","Eff. Date","Expiry","Days","Net Prm.","GST","Total Prm.","Commission%","Status","Risk","Doc","Actions"]}
+        <Table t={t} headers={["Policy ID","Client","Type","Premium","Status","Expiry","Days Left","Risk","Actions"]}
           rows={filtered.map(p=>{
             const d=daysUntil(p.expiry); const dc=d<15?"#f87171":d<45?"#f59e0b":"#34d399";
             return [
-              <span style={{ fontFamily:"monospace", color:"#f59e0b", fontSize:11, whiteSpace:"nowrap" }}>{p.policyNo||p.id}</span>,
-              <span style={{ fontWeight:600, color:t.text, whiteSpace:"nowrap" }}>{p.client}</span>,
-              <span style={{ color:t.textMuted, fontSize:11 }}>{p.contact||"—"}</span>,
-              <span style={{ color:t.textMuted, fontSize:11, whiteSpace:"nowrap" }}>{p.department||p.type}</span>,
-              <span style={{ color:t.textMuted, fontSize:11 }}>{typeIcon(p.type)} {p.type}</span>,
-              <span style={{ color:t.textMuted, fontSize:11, whiteSpace:"nowrap" }}>{p.effectiveDate||"—"}</span>,
-              <span style={{ color:t.textMuted, fontSize:11, whiteSpace:"nowrap" }}>{p.expiry}</span>,
-              <span style={{ color:dc, fontWeight:700, fontSize:11 }}>{d<0?"Expired":`${d}d`}</span>,
-              <span style={{ color:t.text, fontSize:11 }}>{p.netPremium?fmtINR(p.netPremium):"—"}</span>,
-              <span style={{ color:t.textMuted, fontSize:11 }}>{p.gst?fmtINR(p.gst):"—"}</span>,
-              <span style={{ color:t.text, fontWeight:600 }}>{fmtINR(p.premium)}</span>,
-              <span style={{ color:"#34d399", fontSize:11, fontWeight:600 }}>{p.income!=null&&p.income!==""?`${p.income}%`:"—"}</span>,
+              <span style={{ fontFamily:"monospace", color:"#f59e0b", fontSize:11 }}>{p.id}</span>,
+              <span style={{ fontWeight:600, color:t.text }}>{p.client}</span>,
+              <span style={{ color:t.textMuted }}>{typeIcon(p.type)} {p.type}</span>,
+              <span style={{ color:t.text }}>{fmtINR(p.premium)}</span>,
               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor(p.status)}`}>{p.status}</span>,
+              <span style={{ color:t.textMuted, fontSize:11 }}>{p.expiry}</span>,
+              <span style={{ color:dc, fontWeight:700, fontSize:11 }}>{d<0?"Expired":`${d}d`}</span>,
               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${p.risk==="Low"?"text-emerald-400 bg-emerald-500/10":p.risk==="Medium"?"text-amber-400 bg-amber-500/10":"text-red-400 bg-red-500/10"}`}>{p.risk}</span>,
-              p.docLink
-                ? <a href={p.docLink} target="_blank" rel="noopener noreferrer"
-                    style={{ display:"inline-flex", alignItems:"center", gap:4, background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.35)", borderRadius:7, padding:"3px 9px", fontSize:11, color:"#60a5fa", textDecoration:"none", fontWeight:600, whiteSpace:"nowrap" }}>
-                    📄 View
-                  </a>
-                : <span style={{ fontSize:11, color:t.textMuted, opacity:0.4 }}>—</span>,
               <div style={{ display:"flex", gap:6 }}>
-                <button onClick={()=>openEdit(p)} style={{ fontSize:11, padding:"3px 8px", background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:6, color:"#60a5fa", cursor:"pointer" }}>✏️</button>
+                <button onClick={()=>openEdit(p)} style={{ fontSize:11, padding:"3px 8px", background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:6, color:"#60a5fa", cursor:"pointer" }}>✏️ Edit</button>
                 <button onClick={()=>del(p.id)} style={{ fontSize:11, padding:"3px 8px", background:"rgba(248,113,113,0.15)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:6, color:"#f87171", cursor:"pointer" }}>🗑️</button>
               </div>
             ];
@@ -432,36 +427,13 @@ const PoliciesPage = ({ t, data, setData }) => {
         />
       </Section>
       {modal&&(
-        <Modal title={modal==="add"?"Add New Policy":`Edit — ${modal.policyNo||modal.id}`} onClose={()=>setModal(null)} t={t}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 16px" }}>
-            <Field label="Policy No." value={form.policyNo||""} onChange={v=>f({policyNo:v})} t={t}/>
-            <Field label="Client Name" value={form.client} onChange={v=>f({client:v})} t={t} required/>
-            <Field label="Contact No." value={form.contact||""} onChange={v=>f({contact:v})} t={t}/>
-            <Field label="Department" value={form.department||""} onChange={v=>f({department:v})} t={t}/>
-            <Field label="Insurance Type" value={form.type} onChange={v=>f({type:v})} options={["Health","Life","Car","Home"]} t={t}/>
-            <Field label="Status" value={form.status} onChange={v=>f({status:v})} options={["Active","Renewal Due","Lapsed"]} t={t}/>
-            <Field label="Effective Date" value={form.effectiveDate||""} onChange={v=>f({effectiveDate:v})} type="date" t={t}/>
-            <Field label="Expiry Date" value={form.expiry} onChange={v=>f({expiry:v})} type="date" t={t} required/>
-            <Field label="Net Premium (₹)" value={String(form.netPremium||"")} onChange={v=>f({netPremium:v})} type="number" t={t}/>
-            <Field label="GST (₹)" value={String(form.gst||"")} onChange={v=>f({gst:v})} type="number" t={t}/>
-            <Field label="Total Premium (₹)" value={String(form.premium)} onChange={v=>f({premium:v})} type="number" t={t} required/>
-            <Field label="Income / Commission %" value={String(form.income||"")} onChange={v=>f({income:v})} type="number" t={t}/>
-            <Field label="Risk Level" value={form.risk} onChange={v=>f({risk:v})} options={["Low","Medium","High"]} t={t}/>
-          </div>
-          <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:11, fontWeight:600, color:t.textMuted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.05em" }}>Policy Document Link (URL)</label>
-            <div style={{ display:"flex", gap:8 }}>
-              <input value={form.docLink||""} onChange={e=>f({docLink:e.target.value})} placeholder="https://drive.google.com/... ya koi bhi link"
-                style={{ flex:1, background:t.input, border:`1px solid ${form.docLink?"rgba(96,165,250,0.5)":t.inputBorder}`, borderRadius:10, padding:"9px 12px", fontSize:13, color:t.text, outline:"none" }}/>
-              {form.docLink && (
-                <a href={form.docLink} target="_blank" rel="noopener noreferrer"
-                  style={{ background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:10, padding:"9px 14px", color:"#60a5fa", fontSize:12, fontWeight:700, textDecoration:"none", display:"flex", alignItems:"center" }}>
-                  📄 Test
-                </a>
-              )}
-            </div>
-            <p style={{ fontSize:10, color:t.textMuted, marginTop:4 }}>Google Drive, OneDrive, Dropbox, ya koi bhi public link</p>
-          </div>
+        <Modal title={modal==="add"?"Add New Policy":`Edit — ${modal.id}`} onClose={()=>setModal(null)} t={t}>
+          <Field label="Client Name" value={form.client} onChange={v=>f({client:v})} t={t} required/>
+          <Field label="Insurance Type" value={form.type} onChange={v=>f({type:v})} options={["Health","Life","Car","Home"]} t={t}/>
+          <Field label="Annual Premium (₹)" value={form.premium} onChange={v=>f({premium:v})} type="number" t={t} required/>
+          <Field label="Status" value={form.status} onChange={v=>f({status:v})} options={["Active","Renewal Due","Lapsed"]} t={t}/>
+          <Field label="Expiry Date" value={form.expiry} onChange={v=>f({expiry:v})} type="date" t={t} required/>
+          <Field label="Risk Level" value={form.risk} onChange={v=>f({risk:v})} options={["Low","Medium","High"]} t={t}/>
           <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
             <Btn onClick={()=>setModal(null)} outline color={t.textMuted} t={t}>Cancel</Btn>
             <Btn onClick={save} t={t}>{modal==="add"?"Add Policy":"Save Changes"}</Btn>
@@ -1294,197 +1266,6 @@ const GlobalSearch = ({ t, polData, clientData, claimData, payData, setActive, o
   );
 };
 
-// ── AUTH HELPERS ──────────────────────────────────────────────────────────────
-const hashPassword = async (pass) => {
-  try {
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pass + "ATRAV_SALT_2026"));
-    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-  } catch { return btoa(pass + "ATRAV_SALT_2026"); }
-};
-
-const ROLES = {
-  admin:  { label:"Admin",  color:"#f59e0b", badge:"bg-amber-500/20 text-amber-400",    canEdit:true,  canDelete:true,  canImport:true,  canManageUsers:true  },
-  agent:  { label:"Agent",  color:"#60a5fa", badge:"bg-blue-500/20 text-blue-400",      canEdit:true,  canDelete:false, canImport:false, canManageUsers:false },
-  viewer: { label:"Viewer", color:"#34d399", badge:"bg-emerald-500/20 text-emerald-400",canEdit:false, canDelete:false, canImport:false, canManageUsers:false },
-};
-
-// ── LOGIN PAGE ────────────────────────────────────────────────────────────────
-const LoginPage = ({ onLogin }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async () => {
-    if (!username.trim()||!password.trim()) { setError("Username aur password dono daalo."); return; }
-    setLoading(true); setError("");
-    const hashed = await hashPassword(password);
-    let users = JSON.parse(localStorage.getItem("atrav:users")||"[]");
-    if (!users.length) {
-      const defaultHash = await hashPassword("admin123");
-      users = [{ id:"u-001", username:"admin", name:"Super Admin", role:"admin", hash:defaultHash, createdAt:new Date().toISOString() }];
-      localStorage.setItem("atrav:users", JSON.stringify(users));
-    }
-    const user = users.find(u=>u.username.toLowerCase()===username.toLowerCase()&&u.hash===hashed);
-    if (user) {
-      const session = { userId:user.id, username:user.username, name:user.name, role:user.role, loginAt:new Date().toISOString() };
-      localStorage.setItem("atrav:session", JSON.stringify(session));
-      onLogin(session);
-    } else { setError("❌ Username ya password galat hai."); }
-    setLoading(false);
-  };
-
-  return (
-    <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#080d16", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-      <div style={{ width:"100%", maxWidth:420 }}>
-        <div style={{ textAlign:"center", marginBottom:36 }}>
-          <div style={{ width:64, height:64, borderRadius:18, background:"linear-gradient(135deg,#f59e0b,#ea580c)", display:"inline-flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:28, color:"#000", marginBottom:16 }}>A</div>
-          <h1 style={{ color:"#e2e8f0", fontWeight:800, fontSize:26, letterSpacing:"-0.5px" }}>ATRAV Insurance Suite</h1>
-          <p style={{ color:"#94a3b8", fontSize:13, marginTop:6 }}>Apne account mein login karein</p>
-        </div>
-        <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:22, padding:32 }}>
-          <div style={{ marginBottom:16 }}>
-            <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#94a3b8", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.06em" }}>Username</label>
-            <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="Apna username daalo"
-              style={{ width:"100%", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"12px 14px", fontSize:14, color:"#e2e8f0", outline:"none", boxSizing:"border-box" }}/>
-          </div>
-          <div style={{ marginBottom:20 }}>
-            <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#94a3b8", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.06em" }}>Password</label>
-            <div style={{ position:"relative" }}>
-              <input value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} type={showPass?"text":"password"} placeholder="••••••••"
-                style={{ width:"100%", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"12px 44px 12px 14px", fontSize:14, color:"#e2e8f0", outline:"none", boxSizing:"border-box" }}/>
-              <button onClick={()=>setShowPass(p=>!p)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#94a3b8", cursor:"pointer", fontSize:18 }}>{showPass?"🙈":"👁️"}</button>
-            </div>
-          </div>
-          {error && <div style={{ background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:10, padding:"10px 14px", fontSize:13, color:"#f87171", marginBottom:16 }}>{error}</div>}
-          <button onClick={handleLogin} disabled={loading}
-            style={{ width:"100%", background:"linear-gradient(135deg,#f59e0b,#ea580c)", border:"none", borderRadius:12, padding:"14px", fontSize:15, fontWeight:800, color:"#000", cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1, transition:"opacity 0.2s" }}>
-            {loading?"🔄 Logging in...":"🔐 Login"}
-          </button>
-          <div style={{ marginTop:20, padding:14, background:"rgba(255,255,255,0.03)", borderRadius:12, border:"1px solid rgba(255,255,255,0.06)" }}>
-            <p style={{ fontSize:11, color:"#64748b", fontWeight:700, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Default Credentials (Pehli Baar)</p>
-            <p style={{ fontSize:13, color:"#94a3b8" }}>Username: <b style={{ color:"#f59e0b" }}>admin</b> &nbsp; Password: <b style={{ color:"#f59e0b" }}>admin123</b></p>
-            <p style={{ fontSize:11, color:"#64748b", marginTop:8 }}>⚠️ Login ke baad User Settings mein password zaroor change karein!</p>
-          </div>
-        </div>
-        <p style={{ textAlign:"center", color:"#334155", fontSize:11, marginTop:16 }}>© 2026 ATRAV Insurance Suite · Secured with SHA-256</p>
-      </div>
-    </div>
-  );
-};
-
-// ── USER MANAGEMENT PAGE ──────────────────────────────────────────────────────
-const UserManagement = ({ t, currentUser }) => {
-  const [users, setUsers] = useState(()=>JSON.parse(localStorage.getItem("atrav:users")||"[]"));
-  const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ username:"", name:"", role:"agent", password:"" });
-  const [msg, setMsg] = useState(null);
-  const [changingPass, setChangingPass] = useState({});
-  const f = v => setForm(p=>({...p,...v}));
-
-  const saveUsers = (updated) => { setUsers(updated); localStorage.setItem("atrav:users", JSON.stringify(updated)); };
-
-  const saveUser = async () => {
-    if (!form.username||!form.name||!form.password) { setMsg({type:"error",text:"Sab required fields bharo."}); return; }
-    if (users.find(u=>u.username.toLowerCase()===form.username.toLowerCase()&&(!modal||u.id!==modal.id))) { setMsg({type:"error",text:"Yeh username already exist karta hai."}); return; }
-    const hashed = await hashPassword(form.password);
-    if (!modal) saveUsers([...users,{id:`u-${Date.now()}`,username:form.username,name:form.name,role:form.role,hash:hashed,createdAt:new Date().toISOString()}]);
-    else saveUsers(users.map(u=>u.id===modal.id?{...u,username:form.username,name:form.name,role:form.role,hash:hashed}:u));
-    setMsg({type:"success",text:"✅ User save ho gaya!"}); setModal(null); setTimeout(()=>setMsg(null),3000);
-  };
-
-  const doChangePass = async (userId) => {
-    const np = changingPass[userId]?.val||"";
-    if (!np||np.length<4) { setMsg({type:"error",text:"Password kam se kam 4 characters ka hona chahiye."}); return; }
-    const hashed = await hashPassword(np);
-    saveUsers(users.map(u=>u.id===userId?{...u,hash:hashed}:u));
-    setChangingPass(p=>({...p,[userId]:{...p[userId],show:false,val:""}}));
-    setMsg({type:"success",text:"✅ Password change ho gaya!"}); setTimeout(()=>setMsg(null),3000);
-  };
-
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:12 }}>
-        <StatCard t={t} label="Total Users" value={users.length} icon="👤" sub="Registered" color="bg-blue-500/20 text-blue-400"/>
-        <StatCard t={t} label="Admins" value={users.filter(u=>u.role==="admin").length} icon="👑" sub="Full access" color="bg-amber-500/20 text-amber-400"/>
-        <StatCard t={t} label="Agents" value={users.filter(u=>u.role==="agent").length} icon="🧑‍💼" sub="Edit access" color="bg-emerald-500/20 text-emerald-400"/>
-        <StatCard t={t} label="Viewers" value={users.filter(u=>u.role==="viewer").length} icon="👁️" sub="Read only" color="bg-purple-500/20 text-purple-400"/>
-      </div>
-
-      {/* Role guide */}
-      <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-        {Object.entries(ROLES).map(([role,info])=>(
-          <div key={role} style={{ background:info.color+"15", border:`1px solid ${info.color}40`, borderRadius:12, padding:"10px 16px", flex:1, minWidth:140 }}>
-            <p style={{ fontSize:13, fontWeight:700, color:info.color }}>👤 {info.label}</p>
-            <p style={{ fontSize:11, color:"#94a3b8", marginTop:4, lineHeight:1.6 }}>
-              {info.canEdit?"✅":"❌"} Edit &nbsp;{info.canDelete?"✅":"❌"} Delete &nbsp;{info.canImport?"✅":"❌"} Import &nbsp;{info.canManageUsers?"✅":"❌"} Users
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {msg && <div style={{ background:msg.type==="error"?"rgba(248,113,113,0.1)":"rgba(52,211,153,0.1)", border:`1px solid ${msg.type==="error"?"rgba(248,113,113,0.3)":"rgba(52,211,153,0.3)"}`, borderRadius:10, padding:"10px 16px", fontSize:13, color:msg.type==="error"?"#f87171":"#34d399" }}>{msg.text}</div>}
-
-      <Section t={t} title="All Users" action="+ Add User" onAction={()=>{ setForm({username:"",name:"",role:"agent",password:""}); setModal(false); }}>
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {users.map(u=>(
-            <div key={u.id} style={{ background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:14, padding:"14px 18px" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-                <div style={{ width:40, height:40, borderRadius:"50%", background:`linear-gradient(135deg,${ROLES[u.role]?.color||"#94a3b8"},#1e293b)`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, color:"#fff", fontSize:15, flexShrink:0 }}>{u.name[0].toUpperCase()}</div>
-                <div style={{ flex:1, minWidth:100 }}>
-                  <p style={{ fontWeight:700, fontSize:14, color:t.text }}>{u.name} {u.id===currentUser.userId&&<span style={{ fontSize:10, color:"#94a3b8" }}>(You)</span>}</p>
-                  <p style={{ fontSize:11, color:t.textMuted }}>@{u.username} · {new Date(u.createdAt).toLocaleDateString("en-IN")}</p>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-bold ${ROLES[u.role]?.badge}`}>{ROLES[u.role]?.label}</span>
-                {currentUser.role==="admin" && (
-                  <div style={{ display:"flex", gap:6 }}>
-                    <button onClick={()=>setChangingPass(p=>({...p,[u.id]:{show:!p[u.id]?.show,val:p[u.id]?.val||""}}))}
-                      style={{ fontSize:11, padding:"4px 10px", background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:6, color:"#60a5fa", cursor:"pointer" }}>🔑 Password</button>
-                    {u.id!==currentUser.userId && (
-                      <button onClick={()=>saveUsers(users.filter(x=>x.id!==u.id))}
-                        style={{ fontSize:11, padding:"4px 10px", background:"rgba(248,113,113,0.15)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:6, color:"#f87171", cursor:"pointer" }}>🗑️ Remove</button>
-                    )}
-                  </div>
-                )}
-              </div>
-              {changingPass[u.id]?.show && (
-                <div style={{ display:"flex", gap:8, marginTop:12 }}>
-                  <input value={changingPass[u.id]?.val||""} onChange={e=>setChangingPass(p=>({...p,[u.id]:{...p[u.id],val:e.target.value}}))} type="password" placeholder="Naya password (min 4 chars)..."
-                    style={{ flex:1, background:t.input, border:`1px solid ${t.inputBorder}`, borderRadius:8, padding:"8px 12px", fontSize:13, color:t.text, outline:"none" }}/>
-                  <button onClick={()=>doChangePass(u.id)} style={{ background:"linear-gradient(135deg,#f59e0b,#ea580c)", border:"none", borderRadius:8, padding:"8px 14px", fontSize:12, fontWeight:700, color:"#000", cursor:"pointer" }}>Save</button>
-                  <button onClick={()=>setChangingPass(p=>({...p,[u.id]:{...p[u.id],show:false}}))} style={{ background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:8, padding:"8px 10px", fontSize:12, color:t.textMuted, cursor:"pointer" }}>✕</button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {modal!==null && (
-        <Modal title={modal?"Edit User":"Add New User"} onClose={()=>setModal(null)} t={t}>
-          <Field label="Full Name" value={form.name} onChange={v=>f({name:v})} t={t} required/>
-          <Field label="Username" value={form.username} onChange={v=>f({username:v})} t={t} required/>
-          <Field label="Password" value={form.password} onChange={v=>f({password:v})} type="password" t={t} required/>
-          <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:11, fontWeight:600, color:t.textMuted, marginBottom:8, textTransform:"uppercase" }}>Role *</label>
-            <div style={{ display:"flex", gap:8 }}>
-              {Object.entries(ROLES).map(([role,info])=>(
-                <button key={role} onClick={()=>f({role})}
-                  style={{ flex:1, border:`1px solid ${form.role===role?info.color:t.border}`, background:form.role===role?info.color+"25":"transparent", color:form.role===role?info.color:t.textMuted, borderRadius:10, padding:"9px 6px", fontSize:12, fontWeight:700, cursor:"pointer" }}>{info.label}</button>
-              ))}
-            </div>
-          </div>
-          <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
-            <Btn onClick={()=>setModal(null)} outline color={t.textMuted} t={t}>Cancel</Btn>
-            <Btn onClick={saveUser} t={t}>Save User</Btn>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
 // ── IMPORT DATA PAGE ──────────────────────────────────────────────────────────
 const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, setPayData }) => {
   const [tab, setTab] = useState("excel"); // "excel" | "gsheet"
@@ -1500,7 +1281,7 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
 
   // ── COLUMN DEFINITIONS per data type ──
   const SCHEMA = {
-    policies: { required:["policyNo","client","contact","department","type","effectiveDate","expiry","netPremium","gst","premium","commisionable","income","status","risk","docLink"], labels:{ policyNo:"Policy No.", client:"Client Name (Name)", contact:"Contact No.", department:"Department (TW/PVT CAR/MEDICLAIM etc.)", type:"Insurance Type (auto-detected)", effectiveDate:"Effective Date", expiry:"Expiry Date", netPremium:"Net Premium (Net Prm.)", gst:"GST", premium:"Total Premium", commisionable:"OD/Net Prm. Commisionable", income:"Income %", status:"Status", risk:"Risk Level", docLink:"Policy Document Link (URL) — Optional" } },
+    policies:  { required:["client","type","premium","status","expiry","risk"],  labels:{ client:"Client Name", type:"Insurance Type (Health/Life/Car/Home)", premium:"Annual Premium (₹)", status:"Status (Active/Renewal Due/Lapsed)", expiry:"Expiry Date (YYYY-MM-DD)", risk:"Risk Level (Low/Medium/High)" } },
     clients:   { required:["name","email","phone","city","policies","totalPremium","since"], labels:{ name:"Client Name", email:"Email", phone:"Phone", city:"City", policies:"No. of Policies", totalPremium:"Total Premium (₹)", since:"Member Since (Year)" } },
     claims:    { required:["client","type","amount","filed","status","agent"],   labels:{ client:"Client Name", type:"Type (Health/Life/Car/Home)", amount:"Claim Amount (₹)", filed:"Filed Date (YYYY-MM-DD)", status:"Status (In Review/Approved/Rejected)", agent:"Assigned Agent" } },
     agents:    { required:["name","region","policiesSold","revenue","rating","target","commission"], labels:{ name:"Agent Name", region:"Region", policiesSold:"Policies Sold", revenue:"Revenue (Lakhs)", rating:"Rating (0-5)", target:"Monthly Target", commission:"Commission (₹)", claimsHandled:"Claims Handled" } },
@@ -1523,89 +1304,21 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
     });
   };
 
-  // ── INSURANCE TYPE NORMALIZER ──
-  const normalizeType = (val) => {
-    const v = String(val||"").toUpperCase().trim();
-    if (v.includes("TW") || v.includes("TWO") || v.includes("BIKE") || v.includes("MOTOR") || v.includes("CAR") || v.includes("AUTO") || v.includes("VEHICLE") || v.includes("PVT") || v.includes("TRUCK") || v.includes("BUS") || v.includes("TAXI")) return "Car";
-    if (v.includes("MEDICLAIM") || v.includes("HEALTH") || v.includes("MEDICAL") || v.includes("ACCIDENT") || v.includes("PA") || v.includes("CORONA") || v.includes("COVID")) return "Health";
-    if (v.includes("LIFE") || v.includes("TERM") || v.includes("ULIP") || v.includes("ENDOW") || v.includes("LIC") || v.includes("JEEVAN")) return "Life";
-    if (v.includes("HOME") || v.includes("FIRE") || v.includes("HOUSE") || v.includes("PROPERTY") || v.includes("SHOP") || v.includes("BURGLARY")) return "Home";
-    return val || "Health";
-  };
-
-  // ── STATUS NORMALIZER ──
-  const normalizeStatus = (val) => {
-    const v = String(val||"").toUpperCase().trim();
-    if (v.includes("ACTIVE") || v.includes("LIVE") || v.includes("INFORCE") || v.includes("IN FORCE") || v==="1" || v==="YES") return "Active";
-    if (v.includes("RENEW") || v.includes("DUE") || v.includes("EXPIR")) return "Renewal Due";
-    if (v.includes("LAPSE") || v.includes("CANCEL") || v.includes("VOID") || v.includes("EXPIRED") || v==="0" || v==="NO") return "Lapsed";
-    return "Active";
-  };
-
-  // ── DATE NORMALIZER (handles d.m.yyyy, dd/mm/yyyy, mm-dd-yyyy, etc.) ──
-  const normalizeDate = (val) => {
-    if (!val) return "";
-    const s = String(val).trim();
-    // Already YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    // d.m.yyyy or dd.mm.yyyy
-    if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(s)) {
-      const [d,m,y] = s.split(".");
-      return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
-    }
-    // dd/mm/yyyy
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-      const [d,m,y] = s.split("/");
-      return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
-    }
-    // dd-mm-yyyy
-    if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
-      const [d,m,y] = s.split("-");
-      return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
-    }
-    // Try JS Date parse as fallback
-    const dt = new Date(s);
-    if (!isNaN(dt)) return dt.toISOString().slice(0,10);
-    return s;
-  };
-
-  // ── RISK NORMALIZER ──
-  const normalizeRisk = (val) => {
-    const v = String(val||"").toUpperCase().trim();
-    if (v.includes("HIGH") || v.includes("3")) return "High";
-    if (v.includes("MED") || v.includes("2")) return "Medium";
-    return "Low";
-  };
-
   // Map parsed rows → dashboard format using colMap
   const applyMapping = (rows, type, map) => {
     const schema = SCHEMA[type];
-    return rows.map((row) => {
+    return rows.map((row, i) => {
       const item = { id: uid(ID_PREFIX[type]) };
       schema.required.forEach(field => {
         const srcCol = map[field];
-        let val = srcCol ? (row[srcCol] ?? "") : "";
-        // Smart normalization per field
-        if (field === "type") val = normalizeType(val || (map["department"] ? row[map["department"]] : ""));
-        else if (field === "department") val = String(val||"").trim();
-        else if (field === "status") val = normalizeStatus(val);
-        else if (field === "expiry" || field === "filed" || field === "date" || field === "effectiveDate") val = normalizeDate(val);
-        else if (field === "risk") val = normalizeRisk(val);
-        else if (field === "docLink" || field === "policyNo" || field === "contact") val = String(val||"").trim();
-        else if (field === "income") val = parseFloat(String(val||"0").replace(/[%,\s]/g,"")) || 0;
-        else if (field === "netPremium" || field === "gst" || field === "commisionable" || field === "premium" || field === "amount" || field === "totalPremium" || field === "commission") val = Number(String(val||"0").replace(/[₹,\s]/g,"")) || 0;
-        else if (field === "policiesSold" || field === "policies" || field === "target" || field === "claimsHandled") val = Number(val) || 0;
-        else if (field === "revenue" || field === "rating") val = parseFloat(val) || 0;
+        let val = srcCol ? (row[srcCol] || "") : "";
+        if (field === "premium" || field === "amount" || field === "totalPremium" || field === "commission") val = Number(String(val).replace(/[₹,]/g,"")) || 0;
+        if (field === "policiesSold" || field === "policies" || field === "target" || field === "claimsHandled") val = Number(val) || 0;
+        if (field === "revenue" || field === "rating") val = parseFloat(val) || 0;
         item[field] = val;
       });
+      // extra fields
       if (type==="agents" && map["claimsHandled"]) item.claimsHandled = Number(row[map["claimsHandled"]])||0;
-      // Auto-set year/month from date
-      if (type==="policies") {
-        if (!item.year && item.effectiveDate) item.year = item.effectiveDate.slice(0,4);
-        if (!item.month && item.effectiveDate) item.month = new Date(item.effectiveDate).toLocaleString("default",{month:"short"});
-        // If type wasn't mapped but department was, auto-detect
-        if (!item.type || item.type === "Health") item.type = normalizeType(item.department || "");
-      }
       return item;
     }).filter(item => {
       const first = SCHEMA[type].required[0];
@@ -1636,53 +1349,11 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
       if (!rows.length) { setStatus({ type:"error", msg:"File empty hai ya format sahi nahi." }); return; }
       const headers = Object.keys(rows[0]);
       // Auto-guess column mapping
-      // Smart auto-guess column mapping
       const autoMap = {};
       const SCHEMA_TYPE = gsType;
-      const FIELD_ALIASES = {
-        policyNo:     ["policy no","policy no.","policy number","policyno","pol no","policy_no","policy id"],
-        client:       ["name","client","customer","insured","policyholder","policy holder","assured","member"],
-        contact:      ["contact no","contact no.","contact","phone","mobile","mob no","contact number","phone no"],
-        department:   ["department","dept","product","cover","product type"],
-        type:         ["insurance type","ins type"],
-        effectiveDate:["effective date","effective dt","effective","start date","issue date","policy date","from date","inception date","commencement"],
-        netPremium:   ["net prm","net prm.","net premium","net prem","basic premium","basic prm"],
-        gst:          ["gst","tax","service tax","igst","cgst"],
-        premium:      ["total premium","totalpremium","gross premium","total prm","total prm."],
-        commisionable:["od/net prm. commisionable","commisionable","commissionable","od/net prm","od net prm"],
-        income:       ["income%","income %","income","commission %","comm %","brokerage %","rate%"],
-        status:       ["status","policy status","state"],
-        expiry:       ["expiry date","expiry","expiry dt","maturity","end date","policy end","renewal date","due date"],
-        risk:         ["risk","risk level","grade"],
-        docLink:      ["policy link","policy_link","policylink","document link","doc link","link","url","policy url",
-                       "soft copy","pdf link","download link","policy copy","policy document","doc","document",
-                       "policy doc","file link","hyperlink","google drive","drive link","file","attachment","policy file"],
-        name:         ["name","client","customer","insured"],
-        email:        ["email","mail","e-mail","email id"],
-        phone:        ["phone","mobile","mob"],
-        city:         ["city","location","place","district"],
-        policies:     ["policies","no of policies","policy count"],
-        totalPremium: ["total premium","totalpremium","gross premium"],
-        since:        ["since","joining year","member since"],
-        amount:       ["amount","claim amount","loss amount","settled amount"],
-        filed:        ["filed","claim date","filed date","reported date"],
-        agent:        ["agent","rm","relationship manager","executive","sales person"],
-        revenue:      ["revenue","business","premium (l)"],
-        rating:       ["rating","score","stars"],
-        target:       ["target","goal","monthly target"],
-        commission:   ["commission","brokerage","earning","incentive"],
-        date:         ["payment date","paid on","transaction date"],
-        method:       ["method","mode","payment mode","pay mode","channel"],
-      };
       Object.keys(SCHEMA[SCHEMA_TYPE].labels).forEach(field => {
-        const aliases = FIELD_ALIASES[field] || [field];
-        const guess = headers.find(h => {
-          const hl = h.toLowerCase().replace(/[\s._\-\/]/g,"");
-          return aliases.some(a => {
-            const al = a.replace(/[\s._\-\/]/g,"");
-            return hl === al || hl.includes(al) || al.includes(hl);
-          });
-        });
+        const guess = headers.find(h => h.toLowerCase().replace(/[\s_]/g,"").includes(field.toLowerCase().replace(/[\s_]/g,""))
+          || field.toLowerCase().includes(h.toLowerCase().replace(/[\s_]/g,"").slice(0,4)));
         if (guess) autoMap[field] = guess;
       });
       setColMap(autoMap);
@@ -1728,29 +1399,8 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
       if (!rows.length) throw new Error("Sheet mein koi data nahi mila.");
       const headers = Object.keys(rows[0]);
       const autoMap = {};
-      const FIELD_ALIASES2 = {
-        client:["name","client","customer","insured","policyholder","assured","member"],
-        type:["department","type","category","product","insurance type","policy type"],
-        premium:["total premium","totalpremium","premium","gross premium","net prm"],
-        status:["status","policy status","state"],
-        expiry:["expiry date","expiry","expiry dt","maturity","end date","renewal date"],
-        risk:["risk","risk level","grade"],
-        name:["name","client","customer","insured"],
-        email:["email","mail","e-mail"],
-        phone:["phone","contact","mobile","contact no"],
-        city:["city","location","place","district"],
-        amount:["amount","claim amount","loss amount"],
-        filed:["filed","date","claim date"],
-        agent:["agent","rm","executive"],
-        method:["method","mode","payment mode"],
-        date:["date","payment date","paid on"],
-      };
       Object.keys(SCHEMA[type].labels).forEach(field => {
-        const aliases = FIELD_ALIASES2[field] || [field];
-        const guess = headers.find(h => {
-          const hl = h.toLowerCase().replace(/[\s._-]/g,"");
-          return aliases.some(a => hl.includes(a.replace(/[\s._-]/g,"").slice(0,5)));
-        });
+        const guess = headers.find(h => h.toLowerCase().replace(/[\s_]/g,"").includes(field.toLowerCase().replace(/[\s_]/g,"").slice(0,5)));
         if (guess) autoMap[field] = guess;
       });
       setColMap(autoMap);
@@ -1839,34 +1489,10 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
             <p style={{ fontSize:12, fontWeight:700, color:"#f59e0b", marginBottom:10 }}>📋 {gsType.toUpperCase()} — Expected Columns:</p>
             <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
               {Object.entries(SCHEMA[gsType].labels).map(([field, desc])=>(
-                <span key={field} style={{ background: field==="docLink"?"rgba(96,165,250,0.15)":"rgba(245,158,11,0.1)", border: field==="docLink"?"1px solid rgba(96,165,250,0.4)":"1px solid rgba(245,158,11,0.25)", borderRadius:6, padding:"3px 8px", fontSize:11, color: field==="docLink"?"#60a5fa":"#f59e0b" }}>{desc}</span>
+                <span key={field} style={{ background:"rgba(245,158,11,0.1)", border:"1px solid rgba(245,158,11,0.25)", borderRadius:6, padding:"3px 8px", fontSize:11, color:"#f59e0b" }}>{desc}</span>
               ))}
             </div>
           </div>
-
-          {/* Policy Link Special Guide */}
-          {gsType==="policies" && (
-            <div style={{ background:"rgba(96,165,250,0.08)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:12, padding:16 }}>
-              <p style={{ fontSize:13, fontWeight:700, color:"#60a5fa", marginBottom:10 }}>📎 Policy Document Link — Excel mein kaise add karein?</p>
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {[
-                  { step:"1", text:'Excel mein ek nayi column banao — naam rakho: "Policy Link" ya "Link" ya "URL"' },
-                  { step:"2", text:"Har row mein us policy ka Google Drive / OneDrive / Dropbox link paste karo" },
-                  { step:"3", text:"Google Drive link ke liye: File → Share → Copy Link (Anyone with link can view)" },
-                  { step:"4", text:"File upload karo — column auto-detect ho jaayega! Dashboard mein 📄 View button ban jaayega" },
-                ].map(({step,text})=>(
-                  <div key={step} style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
-                    <div style={{ width:20, height:20, borderRadius:"50%", background:"rgba(96,165,250,0.2)", border:"1px solid rgba(96,165,250,0.4)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:700, color:"#60a5fa", flexShrink:0 }}>{step}</div>
-                    <p style={{ fontSize:12, color:t.textMuted, lineHeight:1.5 }}>{text}</p>
-                  </div>
-                ))}
-              </div>
-              <div style={{ marginTop:12, background:"rgba(96,165,250,0.1)", borderRadius:8, padding:"8px 12px" }}>
-                <p style={{ fontSize:11, color:"#60a5fa", fontWeight:600 }}>✅ Auto-detect hone wale column names:</p>
-                <p style={{ fontSize:11, color:t.textMuted, marginTop:3 }}>"Policy Link" · "Link" · "URL" · "Policy URL" · "Document Link" · "Doc Link" · "Soft Copy" · "PDF Link" · "Drive Link" · "Policy Document" · "File"</p>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -2016,260 +1642,11 @@ const NAV=[
   {id:"calendar",label:"Calendar",icon:"📅"},
   {id:"calculator",label:"Premium Calc",icon:"🧮"},
   {id:"import",label:"Import Data",icon:"📥"},
-  {id:"users",label:"Users",icon:"🔐"},
   {id:"ai",label:"AI Assistant",icon:"🤖"},
   {id:"notifications",label:"Notifications",icon:"🔔"},
 ];
 
-// ── AUTH HELPERS ──────────────────────────────────────────────────────────────
-const hashPassword = (pass) => {
-  let hash = 0;
-  for (let i = 0; i < pass.length; i++) {
-    const char = pass.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return "h_" + Math.abs(hash).toString(36) + "_" + pass.length;
-};
-
-const DEFAULT_USERS = [
-  { id:"u1", username:"admin", passwordHash: hashPassword("atrav@2026"), role:"Admin", name:"Admin User", active:true },
-];
-
-// ── LOGIN PAGE ────────────────────────────────────────────────────────────────
-const LoginPage = ({ onLogin }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const users = (() => { try { return JSON.parse(localStorage.getItem("atrav:users") || "null") || DEFAULT_USERS; } catch { return DEFAULT_USERS; }})();
-
-  const handleLogin = (e) => {
-    e?.preventDefault();
-    if (!username || !password) { setError("Username aur password dono fill karein."); return; }
-    setLoading(true); setError("");
-    setTimeout(() => {
-      const user = users.find(u => u.username === username.trim().toLowerCase() && u.passwordHash === hashPassword(password) && u.active);
-      if (user) {
-        const session = { userId: user.id, username: user.username, name: user.name, role: user.role, loginTime: Date.now() };
-        localStorage.setItem("atrav:session", JSON.stringify(session));
-        onLogin(session);
-      } else {
-        setError("❌ Galat username ya password. Dobara try karein.");
-        setLoading(false);
-      }
-    }, 600);
-  };
-
-  return (
-    <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", minHeight:"100vh", background:"#080d16", display:"flex", alignItems:"center", justifyContent:"center", padding:16, position:"relative", overflow:"hidden" }}>
-      {/* Background glow */}
-      <div style={{ position:"absolute", width:500, height:500, borderRadius:"50%", background:"rgba(245,158,11,0.06)", filter:"blur(80px)", top:"10%", left:"20%", pointerEvents:"none" }}/>
-      <div style={{ position:"absolute", width:400, height:400, borderRadius:"50%", background:"rgba(96,165,250,0.05)", filter:"blur(80px)", bottom:"10%", right:"15%", pointerEvents:"none" }}/>
-
-      <div style={{ width:"100%", maxWidth:420, position:"relative" }}>
-        {/* Logo */}
-        <div style={{ textAlign:"center", marginBottom:36 }}>
-          <div style={{ width:64, height:64, borderRadius:18, background:"linear-gradient(135deg,#f59e0b,#ea580c)", display:"inline-flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:28, color:"#000", marginBottom:16, boxShadow:"0 8px 32px rgba(245,158,11,0.35)" }}>A</div>
-          <h1 style={{ color:"#fff", fontWeight:800, fontSize:26, margin:0 }}>ATRAV</h1>
-          <p style={{ color:"#64748b", fontSize:13, marginTop:4 }}>Insurance Suite · Secure Login</p>
-        </div>
-
-        {/* Login Card */}
-        <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:24, padding:32 }}>
-          <h2 style={{ color:"#e2e8f0", fontWeight:700, fontSize:18, marginBottom:6 }}>Welcome back 👋</h2>
-          <p style={{ color:"#64748b", fontSize:13, marginBottom:28 }}>Apna account mein sign in karein</p>
-
-          <form onSubmit={handleLogin} style={{ display:"flex", flexDirection:"column", gap:16 }}>
-            <div>
-              <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#94a3b8", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Username</label>
-              <div style={{ position:"relative" }}>
-                <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:16 }}>👤</span>
-                <input value={username} onChange={e=>{ setUsername(e.target.value); setError(""); }} placeholder="username"
-                  style={{ width:"100%", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"12px 14px 12px 38px", fontSize:14, color:"#e2e8f0", outline:"none", boxSizing:"border-box" }}/>
-              </div>
-            </div>
-            <div>
-              <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#94a3b8", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Password</label>
-              <div style={{ position:"relative" }}>
-                <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:16 }}>🔒</span>
-                <input type={showPass?"text":"password"} value={password} onChange={e=>{ setPassword(e.target.value); setError(""); }} placeholder="••••••••"
-                  style={{ width:"100%", background:"rgba(255,255,255,0.06)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"12px 44px 12px 38px", fontSize:14, color:"#e2e8f0", outline:"none", boxSizing:"border-box" }}/>
-                <button type="button" onClick={()=>setShowPass(p=>!p)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", fontSize:16, color:"#64748b" }}>{showPass?"🙈":"👁️"}</button>
-              </div>
-            </div>
-            {error && (
-              <div style={{ background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:10, padding:"10px 14px", fontSize:13, color:"#f87171" }}>{error}</div>
-            )}
-            <button type="submit" disabled={loading}
-              style={{ background:"linear-gradient(135deg,#f59e0b,#ea580c)", border:"none", borderRadius:12, padding:"13px", fontSize:14, fontWeight:800, color:"#000", cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1, marginTop:4, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
-              {loading ? <><div style={{ width:16, height:16, border:"2px solid rgba(0,0,0,0.3)", borderTop:"2px solid #000", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/> Signing in...</> : "🔐 Sign In"}
-            </button>
-          </form>
-
-          <div style={{ marginTop:24, padding:"14px 16px", background:"rgba(245,158,11,0.08)", border:"1px solid rgba(245,158,11,0.2)", borderRadius:12 }}>
-            <p style={{ fontSize:11, color:"#f59e0b", fontWeight:700, marginBottom:6 }}>🔑 Default Credentials:</p>
-            <p style={{ fontSize:12, color:"#94a3b8", lineHeight:1.7 }}>Username: <span style={{ color:"#e2e8f0", fontWeight:600 }}>admin</span><br/>Password: <span style={{ color:"#e2e8f0", fontWeight:600 }}>atrav@2026</span></p>
-            <p style={{ fontSize:10, color:"#64748b", marginTop:6 }}>⚠️ Login ke baad Settings mein password zaroor change karein!</p>
-          </div>
-        </div>
-        <p style={{ textAlign:"center", color:"#334155", fontSize:11, marginTop:20 }}>ATRAV Insurance Suite · Secured with localStorage encryption</p>
-      </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  );
-};
-
-// ── USER MANAGEMENT PAGE ──────────────────────────────────────────────────────
-const UserManagement = ({ t, currentUser }) => {
-  const [users, setUsersRaw] = useState(() => { try { return JSON.parse(localStorage.getItem("atrav:users") || "null") || DEFAULT_USERS; } catch { return DEFAULT_USERS; }});
-  const [modal, setModal] = useState(null); // null | "add" | user
-  const [form, setForm] = useState({ username:"", name:"", password:"", role:"Agent", active:true });
-  const [pwModal, setPwModal] = useState(false);
-  const [pwForm, setPwForm] = useState({ current:"", newPw:"", confirm:"" });
-  const [pwError, setPwError] = useState("");
-  const [pwSuccess, setPwSuccess] = useState("");
-  const [msg, setMsg] = useState("");
-  const f = v => setForm(p=>({...p,...v}));
-
-  const saveUsers = (u) => { setUsersRaw(u); localStorage.setItem("atrav:users", JSON.stringify(u)); };
-
-  const addUser = () => {
-    if (!form.username||!form.password||!form.name) { setMsg("Sab fields fill karein."); return; }
-    if (users.find(u=>u.username===form.username.toLowerCase())) { setMsg("Yeh username pehle se exist karta hai."); return; }
-    const newUser = { id:`u${Date.now()}`, username:form.username.toLowerCase().trim(), name:form.name.trim(), passwordHash:hashPassword(form.password), role:form.role, active:true };
-    saveUsers([...users, newUser]);
-    setModal(null); setMsg("✅ User add ho gaya!");
-    setTimeout(()=>setMsg(""), 3000);
-  };
-
-  const toggleUser = (id) => {
-    if (id==="u1"&&currentUser.userId==="u1") { setMsg("⚠️ Admin account disable nahi kar sakte."); setTimeout(()=>setMsg(""), 3000); return; }
-    saveUsers(users.map(u=>u.id===id?{...u,active:!u.active}:u));
-  };
-
-  const deleteUser = (id) => {
-    if (id==="u1") { setMsg("⚠️ Default admin delete nahi ho sakta."); setTimeout(()=>setMsg(""), 3000); return; }
-    saveUsers(users.filter(u=>u.id!==id));
-  };
-
-  const changePassword = () => {
-    setPwError(""); setPwSuccess("");
-    const me = users.find(u=>u.id===currentUser.userId);
-    if (!me || me.passwordHash !== hashPassword(pwForm.current)) { setPwError("Current password galat hai."); return; }
-    if (pwForm.newPw.length < 6) { setPwError("New password kam se kam 6 characters ka hona chahiye."); return; }
-    if (pwForm.newPw !== pwForm.confirm) { setPwError("New password aur confirm password match nahi karte."); return; }
-    saveUsers(users.map(u=>u.id===currentUser.userId?{...u,passwordHash:hashPassword(pwForm.newPw)}:u));
-    setPwSuccess("✅ Password successfully change ho gaya!"); setPwForm({current:"",newPw:"",confirm:""});
-    setTimeout(()=>{ setPwModal(false); setPwSuccess(""); }, 2000);
-  };
-
-  const ROLE_COLORS = { Admin:"text-amber-400 bg-amber-500/15 border border-amber-500/30", Agent:"text-blue-400 bg-blue-500/15 border border-blue-500/30", Viewer:"text-slate-400 bg-slate-500/15 border border-slate-500/30" };
-
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12 }}>
-        <StatCard t={t} label="Total Users" value={users.length} icon="👥" sub="All roles" color="bg-blue-500/20 text-blue-400"/>
-        <StatCard t={t} label="Active Users" value={users.filter(u=>u.active).length} icon="✅" sub="Can login" color="bg-emerald-500/20 text-emerald-400"/>
-        <StatCard t={t} label="Admins" value={users.filter(u=>u.role==="Admin").length} icon="🛡️" sub="Full access" color="bg-amber-500/20 text-amber-400"/>
-        <StatCard t={t} label="Agents" value={users.filter(u=>u.role==="Agent").length} icon="🧑‍💼" sub="Limited access" color="bg-purple-500/20 text-purple-400"/>
-      </div>
-
-      {msg&&<div style={{ background:"rgba(52,211,153,0.1)", border:"1px solid rgba(52,211,153,0.3)", borderRadius:10, padding:"10px 16px", fontSize:13, color:"#34d399" }}>{msg}</div>}
-
-      <Section t={t} title="👥 User Management" action="+ Add User" onAction={()=>{ setForm({username:"",name:"",password:"",role:"Agent",active:true}); setModal("add"); }}>
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {users.map(u=>(
-            <div key={u.id} style={{ background:t.inputBg, border:`1px solid ${u.active?t.border:"rgba(248,113,113,0.2)"}`, borderRadius:14, padding:"14px 18px", display:"flex", alignItems:"center", gap:14, flexWrap:"wrap" }}>
-              <div style={{ width:40, height:40, borderRadius:"50%", background:`linear-gradient(135deg,${u.role==="Admin"?"#f59e0b,#ea580c":u.role==="Agent"?"#60a5fa,#3b82f6":"#94a3b8,#64748b"})`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:15, color:"#000", flexShrink:0 }}>{u.name[0].toUpperCase()}</div>
-              <div style={{ flex:1, minWidth:120 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                  <p style={{ fontWeight:700, fontSize:14, color:t.text }}>{u.name}</p>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${ROLE_COLORS[u.role]}`}>{u.role}</span>
-                  {!u.active&&<span className="px-2 py-0.5 rounded-full text-xs font-semibold text-red-400 bg-red-500/15 border border-red-500/30">Disabled</span>}
-                  {u.id===currentUser.userId&&<span className="px-2 py-0.5 rounded-full text-xs font-semibold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30">You</span>}
-                </div>
-                <p style={{ fontSize:12, color:t.textMuted, marginTop:2 }}>@{u.username}</p>
-              </div>
-              <div style={{ display:"flex", gap:8, flexShrink:0, flexWrap:"wrap" }}>
-                {u.id===currentUser.userId&&(
-                  <button onClick={()=>{ setPwForm({current:"",newPw:"",confirm:""}); setPwError(""); setPwSuccess(""); setPwModal(true); }}
-                    style={{ fontSize:11, padding:"5px 12px", background:"rgba(245,158,11,0.15)", border:"1px solid rgba(245,158,11,0.3)", borderRadius:8, color:"#f59e0b", cursor:"pointer", fontWeight:600 }}>🔑 Change Password</button>
-                )}
-                <button onClick={()=>toggleUser(u.id)}
-                  style={{ fontSize:11, padding:"5px 12px", background:u.active?"rgba(248,113,113,0.1)":"rgba(52,211,153,0.1)", border:`1px solid ${u.active?"rgba(248,113,113,0.3)":"rgba(52,211,153,0.3)"}`, borderRadius:8, color:u.active?"#f87171":"#34d399", cursor:"pointer", fontWeight:600 }}>
-                  {u.active?"🚫 Disable":"✅ Enable"}
-                </button>
-                {u.id!=="u1"&&(
-                  <button onClick={()=>deleteUser(u.id)}
-                    style={{ fontSize:11, padding:"5px 12px", background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:8, color:"#f87171", cursor:"pointer", fontWeight:600 }}>🗑️ Delete</button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* Role Permissions */}
-      <Section t={t} title="🛡️ Role Permissions">
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:12 }}>
-          {[
-            { role:"Admin 👑", color:"#f59e0b", perms:["Full dashboard access","Add / Edit / Delete all data","User management","Reset data","Import data","Export PDF & CSV","AI Assistant"] },
-            { role:"Agent 🧑‍💼", color:"#60a5fa", perms:["View all sections","Add new policies & clients","File new claims","View payments","Import data","AI Assistant","Cannot delete or manage users"] },
-            { role:"Viewer 👁️", color:"#94a3b8", perms:["Read-only access","View all sections","Export CSV & PDF","AI Assistant","Cannot add, edit or delete","Cannot import data"] },
-          ].map(r=>(
-            <div key={r.role} style={{ background:t.inputBg, border:`1px solid ${r.color}30`, borderRadius:14, padding:16 }}>
-              <p style={{ fontWeight:700, fontSize:14, color:r.color, marginBottom:10 }}>{r.role}</p>
-              {r.perms.map((p,i)=>(
-                <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:6, marginBottom:5 }}>
-                  <span style={{ color: p.startsWith("Cannot")?"#f87171":"#34d399", fontSize:12, flexShrink:0 }}>{p.startsWith("Cannot")?"✗":"✓"}</span>
-                  <span style={{ fontSize:12, color:t.textMuted }}>{p}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* Add User Modal */}
-      {modal&&(
-        <Modal title="Add New User" onClose={()=>setModal(null)} t={t}>
-          <Field label="Full Name" value={form.name} onChange={v=>f({name:v})} t={t} required/>
-          <Field label="Username" value={form.username} onChange={v=>f({username:v.toLowerCase().replace(/\s/g,"")})} t={t} required/>
-          <Field label="Password" value={form.password} onChange={v=>f({password:v})} type="password" t={t} required/>
-          <Field label="Role" value={form.role} onChange={v=>f({role:v})} options={["Admin","Agent","Viewer"]} t={t}/>
-          <div style={{ background:"rgba(245,158,11,0.08)", border:"1px solid rgba(245,158,11,0.2)", borderRadius:10, padding:"10px 14px", marginBottom:14 }}>
-            <p style={{ fontSize:12, color:"#f59e0b" }}>⚠️ Password user ko seedha batao — yeh system mein encrypted store hoga.</p>
-          </div>
-          {msg&&<p style={{ fontSize:12, color:"#f87171", marginBottom:8 }}>{msg}</p>}
-          <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
-            <Btn onClick={()=>setModal(null)} outline color={t.textMuted} t={t}>Cancel</Btn>
-            <Btn onClick={addUser} t={t}>Add User</Btn>
-          </div>
-        </Modal>
-      )}
-
-      {/* Change Password Modal */}
-      {pwModal&&(
-        <Modal title="🔑 Change Password" onClose={()=>setPwModal(false)} t={t}>
-          <Field label="Current Password" value={pwForm.current} onChange={v=>setPwForm(p=>({...p,current:v}))} type="password" t={t} required/>
-          <Field label="New Password" value={pwForm.newPw} onChange={v=>setPwForm(p=>({...p,newPw:v}))} type="password" t={t} required/>
-          <Field label="Confirm New Password" value={pwForm.confirm} onChange={v=>setPwForm(p=>({...p,confirm:v}))} type="password" t={t} required/>
-          {pwError&&<div style={{ background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:8, padding:"8px 12px", fontSize:12, color:"#f87171", marginBottom:8 }}>{pwError}</div>}
-          {pwSuccess&&<div style={{ background:"rgba(52,211,153,0.1)", border:"1px solid rgba(52,211,153,0.3)", borderRadius:8, padding:"8px 12px", fontSize:12, color:"#34d399", marginBottom:8 }}>{pwSuccess}</div>}
-          <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
-            <Btn onClick={()=>setPwModal(false)} outline color={t.textMuted} t={t}>Cancel</Btn>
-            <Btn onClick={changePassword} t={t}>Change Password</Btn>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
-
+// ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function InsuranceDashboard() {
   const [active, setActive] = useState("overview");
   const [dark, setDark] = useState(true);
@@ -2277,19 +1654,7 @@ export default function InsuranceDashboard() {
   const [showSearch, setShowSearch] = useState(false);
   const [showFAB, setShowFAB] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [saveStatus, setSaveStatus] = useState(null);
-
-  // ── SESSION ──
-  const [session, setSession] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("atrav:session") || "null"); } catch { return null; }
-  });
-  const handleLogin = (sess) => setSession(sess);
-  const handleLogout = () => { localStorage.removeItem("atrav:session"); setSession(null); };
-  const isAdmin = session?.role === "Admin";
-  const isViewer = session?.role === "Viewer";
-
-  // Show login if not authenticated
-  if (!session) return <LoginPage onLogin={handleLogin}/>;
+  const [saveStatus, setSaveStatus] = useState(null); // "saving" | "saved" | null
 
   // ── PERSISTENT DATA ──
   const [notifications, setNotificationsRaw, notifLoaded] = usePersistedState("atrav:notifications", NOTIFICATIONS_INIT);
@@ -2366,7 +1731,6 @@ export default function InsuranceDashboard() {
     calendar: <CalendarPage t={t}/>,
     calculator: <Calculator t={t}/>,
     import: <ImportPage t={t} setPolData={setPolData} setClientData={setClientData} setClaimData={setClaimData} setAgentData={setAgentData} setPayData={setPayData}/>,
-    users: <UserManagement t={t} currentUser={session}/>,
     ai: <AIPage t={t}/>,
     notifications: <NotificationsPage t={t} notifications={notifications} setNotifications={setNotifications}/>,
   };
@@ -2393,18 +1757,14 @@ export default function InsuranceDashboard() {
         </nav>
         <div style={{ borderTop:`1px solid ${t.sidebarBorder}`, padding:"12px 14px", whiteSpace:"nowrap" }}>
           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-            <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#f59e0b,#ea580c)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:"#000", flexShrink:0 }}>{session.name[0].toUpperCase()}</div>
-            <div style={{ minWidth:0 }}>
-              <p style={{ fontSize:12, fontWeight:700, color:t.text, overflow:"hidden", textOverflow:"ellipsis" }}>{session.name}</p>
-              <p style={{ fontSize:10, color:t.textMuted }}>{session.role} · @{session.username}</p>
-            </div>
+            <div style={{ width:28, height:28, borderRadius:"50%", background:"linear-gradient(135deg,#60a5fa,#7c3aed)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"#fff", flexShrink:0 }}>A</div>
+            <div><p style={{ fontSize:12, fontWeight:600, color:t.text }}>Admin</p><p style={{ fontSize:10, color:t.textMuted }}>Super Manager</p></div>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 8px", borderRadius:8, background:"rgba(52,211,153,0.08)", border:"1px solid rgba(52,211,153,0.2)", marginBottom:6 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 8px", borderRadius:8, background:"rgba(52,211,153,0.08)", border:"1px solid rgba(52,211,153,0.2)" }}>
             <div style={{ width:6, height:6, borderRadius:99, background:"#34d399", flexShrink:0 }}/>
             <span style={{ fontSize:10, color:"#34d399", fontWeight:600 }}>Data auto-saved ✓</span>
           </div>
-          {isAdmin&&<button onClick={()=>setShowResetConfirm(true)} style={{ width:"100%", marginBottom:6, background:"rgba(248,113,113,0.08)", border:"1px solid rgba(248,113,113,0.2)", borderRadius:8, padding:"5px 10px", fontSize:11, color:"#f87171", cursor:"pointer", fontWeight:600 }}>🔄 Reset to Default Data</button>}
-          <button onClick={handleLogout} style={{ width:"100%", background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.25)", borderRadius:8, padding:"7px 10px", fontSize:12, color:"#f87171", cursor:"pointer", fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>🚪 Logout</button>
+          <button onClick={()=>setShowResetConfirm(true)} style={{ width:"100%", marginTop:8, background:"rgba(248,113,113,0.08)", border:"1px solid rgba(248,113,113,0.2)", borderRadius:8, padding:"6px 10px", fontSize:11, color:"#f87171", cursor:"pointer", fontWeight:600 }}>🔄 Reset to Default Data</button>
         </div>
       </aside>
 
