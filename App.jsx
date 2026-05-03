@@ -1304,21 +1304,89 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
     });
   };
 
+  // ── INSURANCE TYPE NORMALIZER ──
+  const normalizeType = (val) => {
+    const v = String(val||"").toUpperCase().trim();
+    if (v.includes("TW") || v.includes("TWO") || v.includes("BIKE") || v.includes("MOTOR") || v.includes("CAR") || v.includes("AUTO") || v.includes("VEHICLE") || v.includes("PVT") || v.includes("TRUCK") || v.includes("BUS") || v.includes("TAXI")) return "Car";
+    if (v.includes("MEDICLAIM") || v.includes("HEALTH") || v.includes("MEDICAL") || v.includes("ACCIDENT") || v.includes("PA") || v.includes("CORONA") || v.includes("COVID")) return "Health";
+    if (v.includes("LIFE") || v.includes("TERM") || v.includes("ULIP") || v.includes("ENDOW") || v.includes("LIC") || v.includes("JEEVAN")) return "Life";
+    if (v.includes("HOME") || v.includes("FIRE") || v.includes("HOUSE") || v.includes("PROPERTY") || v.includes("SHOP") || v.includes("BURGLARY")) return "Home";
+    return val || "Health";
+  };
+
+  // ── STATUS NORMALIZER ──
+  const normalizeStatus = (val) => {
+    const v = String(val||"").toUpperCase().trim();
+    if (v.includes("ACTIVE") || v.includes("LIVE") || v.includes("INFORCE") || v.includes("IN FORCE") || v==="1" || v==="YES") return "Active";
+    if (v.includes("RENEW") || v.includes("DUE") || v.includes("EXPIR")) return "Renewal Due";
+    if (v.includes("LAPSE") || v.includes("CANCEL") || v.includes("VOID") || v.includes("EXPIRED") || v==="0" || v==="NO") return "Lapsed";
+    return "Active";
+  };
+
+  // ── DATE NORMALIZER (handles d.m.yyyy, dd/mm/yyyy, mm-dd-yyyy, etc.) ──
+  const normalizeDate = (val) => {
+    if (!val) return "";
+    const s = String(val).trim();
+    // Already YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // d.m.yyyy or dd.mm.yyyy
+    if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(s)) {
+      const [d,m,y] = s.split(".");
+      return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+    }
+    // dd/mm/yyyy
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+      const [d,m,y] = s.split("/");
+      return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+    }
+    // dd-mm-yyyy
+    if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
+      const [d,m,y] = s.split("-");
+      return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+    }
+    // Try JS Date parse as fallback
+    const dt = new Date(s);
+    if (!isNaN(dt)) return dt.toISOString().slice(0,10);
+    return s;
+  };
+
+  // ── RISK NORMALIZER ──
+  const normalizeRisk = (val) => {
+    const v = String(val||"").toUpperCase().trim();
+    if (v.includes("HIGH") || v.includes("3")) return "High";
+    if (v.includes("MED") || v.includes("2")) return "Medium";
+    return "Low";
+  };
+
   // Map parsed rows → dashboard format using colMap
   const applyMapping = (rows, type, map) => {
     const schema = SCHEMA[type];
-    return rows.map((row, i) => {
+    return rows.map((row) => {
       const item = { id: uid(ID_PREFIX[type]) };
       schema.required.forEach(field => {
         const srcCol = map[field];
-        let val = srcCol ? (row[srcCol] || "") : "";
-        if (field === "premium" || field === "amount" || field === "totalPremium" || field === "commission") val = Number(String(val).replace(/[₹,]/g,"")) || 0;
-        if (field === "policiesSold" || field === "policies" || field === "target" || field === "claimsHandled") val = Number(val) || 0;
-        if (field === "revenue" || field === "rating") val = parseFloat(val) || 0;
+        let val = srcCol ? (row[srcCol] ?? "") : "";
+        // Smart normalization per field
+        if (field === "type") val = normalizeType(val);
+        else if (field === "status") val = normalizeStatus(val);
+        else if (field === "expiry" || field === "filed" || field === "date") val = normalizeDate(val);
+        else if (field === "risk") val = normalizeRisk(val);
+        else if (field === "premium" || field === "amount" || field === "totalPremium" || field === "commission") val = Number(String(val).replace(/[₹,\s]/g,"")) || 0;
+        else if (field === "policiesSold" || field === "policies" || field === "target" || field === "claimsHandled") val = Number(val) || 0;
+        else if (field === "revenue" || field === "rating") val = parseFloat(val) || 0;
         item[field] = val;
       });
-      // extra fields
       if (type==="agents" && map["claimsHandled"]) item.claimsHandled = Number(row[map["claimsHandled"]])||0;
+      // For policies: store extra fields too
+      if (type==="policies") {
+        if (row["Policy no."] || row["Policy no"]) item.policyNo = row["Policy no."] || row["Policy no"] || "";
+        if (row["Contact no."] || row["Contact no"]) item.contact = row["Contact no."] || row["Contact no"] || "";
+        if (row["Net Prm."] || row["Net Prm"]) item.netPremium = Number(String(row["Net Prm."]||row["Net Prm"]||0).replace(/[,\s]/g,""))||0;
+        if (row["GST"]) item.gst = Number(String(row["GST"]||0).replace(/[,\s]/g,""))||0;
+        if (row["Effective date"]) item.effectiveDate = normalizeDate(row["Effective date"]);
+        if (row["Year"]) item.year = row["Year"];
+        if (row["Month"]) item.month = row["Month"];
+      }
       return item;
     }).filter(item => {
       const first = SCHEMA[type].required[0];
@@ -1349,11 +1417,39 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
       if (!rows.length) { setStatus({ type:"error", msg:"File empty hai ya format sahi nahi." }); return; }
       const headers = Object.keys(rows[0]);
       // Auto-guess column mapping
+      // Smart auto-guess column mapping
       const autoMap = {};
       const SCHEMA_TYPE = gsType;
+      const FIELD_ALIASES = {
+        client: ["name","client","customer","insured","policyholder","policy holder","assured","member"],
+        type:   ["department","type","category","product","insurance type","policy type","cover type"],
+        premium:["total premium","totalpremium","premium","gross premium","net prm","net premium","amount"],
+        status: ["status","policy status","state"],
+        expiry: ["expiry date","expiry","expiry dt","maturity","end date","policy end","renewal date","due date"],
+        risk:   ["risk","risk level","grade"],
+        name:   ["name","client","customer","insured"],
+        email:  ["email","mail","e-mail","email id"],
+        phone:  ["phone","contact","mobile","contact no","phone no","mob"],
+        city:   ["city","location","place","district","state"],
+        policies:["policies","no of policies","policy count"],
+        totalPremium:["total premium","totalpremium","premium","gross premium"],
+        since:  ["since","year","joining year","member since","from year"],
+        amount: ["amount","claim amount","loss amount","settled amount"],
+        filed:  ["filed","date","claim date","filed date","reported date"],
+        agent:  ["agent","rm","relationship manager","executive","sales person","emp"],
+        revenue:["revenue","business","premium (l)","revenue (l)"],
+        rating: ["rating","score","stars"],
+        target: ["target","goal","monthly target"],
+        commission:["commission","brokerage","earning","incentive"],
+        method: ["method","mode","payment mode","pay mode","channel"],
+        date:   ["date","payment date","paid on","transaction date"],
+      };
       Object.keys(SCHEMA[SCHEMA_TYPE].labels).forEach(field => {
-        const guess = headers.find(h => h.toLowerCase().replace(/[\s_]/g,"").includes(field.toLowerCase().replace(/[\s_]/g,""))
-          || field.toLowerCase().includes(h.toLowerCase().replace(/[\s_]/g,"").slice(0,4)));
+        const aliases = FIELD_ALIASES[field] || [field];
+        const guess = headers.find(h => {
+          const hl = h.toLowerCase().replace(/[\s._-]/g,"");
+          return aliases.some(a => hl.includes(a.replace(/[\s._-]/g,"")) || a.replace(/[\s._-]/g,"").includes(hl.slice(0,4)));
+        });
         if (guess) autoMap[field] = guess;
       });
       setColMap(autoMap);
@@ -1399,8 +1495,29 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
       if (!rows.length) throw new Error("Sheet mein koi data nahi mila.");
       const headers = Object.keys(rows[0]);
       const autoMap = {};
+      const FIELD_ALIASES2 = {
+        client:["name","client","customer","insured","policyholder","assured","member"],
+        type:["department","type","category","product","insurance type","policy type"],
+        premium:["total premium","totalpremium","premium","gross premium","net prm"],
+        status:["status","policy status","state"],
+        expiry:["expiry date","expiry","expiry dt","maturity","end date","renewal date"],
+        risk:["risk","risk level","grade"],
+        name:["name","client","customer","insured"],
+        email:["email","mail","e-mail"],
+        phone:["phone","contact","mobile","contact no"],
+        city:["city","location","place","district"],
+        amount:["amount","claim amount","loss amount"],
+        filed:["filed","date","claim date"],
+        agent:["agent","rm","executive"],
+        method:["method","mode","payment mode"],
+        date:["date","payment date","paid on"],
+      };
       Object.keys(SCHEMA[type].labels).forEach(field => {
-        const guess = headers.find(h => h.toLowerCase().replace(/[\s_]/g,"").includes(field.toLowerCase().replace(/[\s_]/g,"").slice(0,5)));
+        const aliases = FIELD_ALIASES2[field] || [field];
+        const guess = headers.find(h => {
+          const hl = h.toLowerCase().replace(/[\s._-]/g,"");
+          return aliases.some(a => hl.includes(a.replace(/[\s._-]/g,"").slice(0,5)));
+        });
         if (guess) autoMap[field] = guess;
       });
       setColMap(autoMap);
