@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
 const getTheme = (dark) => ({
@@ -21,40 +20,6 @@ const getTheme = (dark) => ({
 });
 
 // ── INITIAL DATA ──────────────────────────────────────────────────────────────
-const revenueData = [
-  { month:"Jan", health:420000, life:310000, car:180000, home:140000 },
-  { month:"Feb", health:390000, life:340000, car:200000, home:160000 },
-  { month:"Mar", health:510000, life:290000, car:220000, home:175000 },
-  { month:"Apr", health:480000, life:370000, car:195000, home:190000 },
-  { month:"May", health:560000, life:410000, car:240000, home:210000 },
-  { month:"Jun", health:610000, life:450000, car:260000, home:230000 },
-  { month:"Jul", health:590000, life:430000, car:250000, home:215000 },
-  { month:"Aug", health:640000, life:470000, car:270000, home:240000 },
-  { month:"Sep", health:700000, life:510000, car:290000, home:260000 },
-  { month:"Oct", health:680000, life:490000, car:280000, home:250000 },
-  { month:"Nov", health:720000, life:530000, car:300000, home:270000 },
-  { month:"Dec", health:780000, life:580000, car:320000, home:295000 },
-];
-const claimsData = [
-  { month:"Jan", filed:120, approved:98, rejected:22 },
-  { month:"Feb", filed:105, approved:87, rejected:18 },
-  { month:"Mar", filed:140, approved:112, rejected:28 },
-  { month:"Apr", filed:130, approved:108, rejected:22 },
-  { month:"May", filed:160, approved:130, rejected:30 },
-  { month:"Jun", filed:175, approved:145, rejected:30 },
-];
-const policyMix = [{ name:"Health", value:38 },{ name:"Life", value:28 },{ name:"Car", value:22 },{ name:"Home", value:12 }];
-const PIE_COLORS = ["#f59e0b","#60a5fa","#34d399","#f87171"];
-const regionData = [
-  { name:"Maharashtra", policies:842, revenue:28.4, color:"#f59e0b" },
-  { name:"Delhi NCR", policies:614, revenue:21.2, color:"#60a5fa" },
-  { name:"Karnataka", policies:521, revenue:18.6, color:"#34d399" },
-  { name:"Tamil Nadu", policies:438, revenue:15.1, color:"#a78bfa" },
-  { name:"Gujarat", policies:392, revenue:13.8, color:"#f87171" },
-  { name:"Telangana", policies:318, revenue:11.2, color:"#fb923c" },
-  { name:"West Bengal", policies:276, revenue:9.4, color:"#22d3ee" },
-  { name:"Rajasthan", policies:241, revenue:8.1, color:"#4ade80" },
-];
 const INIT_POLICIES = [
   { id:"POL-1042", policyNo:"", client:"Rahul Sharma", contact:"9876543210", type:"Health", department:"MEDICLAIM", effectiveDate:"2026-01-15", expiry:"2026-06-15", netPremium:15678, gst:2822, premium:18500, commisionable:15678, income:8.5, status:"Active", risk:"Low", docLink:"", year:"2026", month:"Jan" },
   { id:"POL-1043", policyNo:"", client:"Priya Mehta", contact:"8765432109", type:"Life", department:"LIFE", effectiveDate:"2024-07-22", expiry:"2035-07-22", netPremium:27119, gst:4881, premium:32000, commisionable:27119, income:12, status:"Active", risk:"Low", docLink:"", year:"2024", month:"Jul" },
@@ -247,167 +212,241 @@ const SearchBar = ({ value, onChange, placeholder, t }) => (
 );
 
 // ── OVERVIEW ──────────────────────────────────────────────────────────────────
-const Overview = ({ t, polData, clientData }) => {
+const Overview = ({ t, polData, clientData, claimData, payData }) => {
   const renewalDue = polData.filter(p=>p.status==="Renewal Due"||p.status==="Lapsed");
+  const totalPremium = polData.reduce((s,p)=>s+(Number(p.premium)||0),0);
+  const totalNetPrm = polData.reduce((s,p)=>s+(Number(p.netPremium)||0),0);
+  const totalGST = polData.reduce((s,p)=>s+(Number(p.gst)||0),0);
+  const upcoming = polData.filter(p=>{ const d=daysUntil(p.expiry); return d>=0&&d<=30; }).sort((a,b)=>daysUntil(a.expiry)-daysUntil(b.expiry));
+  const thisMonth = new Date().getMonth();
+  const thisYear = new Date().getFullYear();
+  const monthlyPolicies = polData.filter(p=>{ try { const d=new Date(p.effectiveDate||""); return d.getMonth()===thisMonth&&d.getFullYear()===thisYear; } catch { return false; }});
+  const deptMap = {};
+  polData.forEach(p=>{ const k=p.department||p.type||"Other"; deptMap[k]=(deptMap[k]||0)+1; });
+  const deptBreakdown = Object.entries(deptMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))", gap:14 }}>
-        <StatCard t={t} label="Total Active Policies" value={polData.filter(p=>p.status==="Active").length} icon="📋" sub="↑ 12% MoM" color="bg-emerald-500/20 text-emerald-400"/>
-        <StatCard t={t} label="Monthly Revenue" value="₹78.2L" icon="💰" sub="↑ 8.4% MoM" color="bg-emerald-500/20 text-emerald-400"/>
-        <StatCard t={t} label="Pending Claims" value="47" icon="⚠️" sub="↓ 5 this week" color="bg-amber-500/20 text-amber-400"/>
-        <StatCard t={t} label="Total Clients" value={clientData.length} icon="👥" sub="↑ 34 new" color="bg-blue-500/20 text-blue-400"/>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:16 }}>
-        <Section t={t} title="Revenue by Insurance Type (2025-26)">
-          <ResponsiveContainer width="100%" height={210}>
-            <AreaChart data={revenueData}>
-              <defs>
-                {[["health","#f59e0b"],["life","#60a5fa"],["car","#34d399"],["home","#f87171"]].map(([k,c])=>(
-                  <linearGradient key={k} id={`g${k}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={c} stopOpacity={0.3}/><stop offset="95%" stopColor={c} stopOpacity={0}/>
-                  </linearGradient>
-                ))}
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={t.chartGrid}/>
-              <XAxis dataKey="month" tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
-              <YAxis tickFormatter={fmt} tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
-              <Tooltip formatter={v=>fmt(v)} contentStyle={{background:t.tooltip,border:`1px solid ${t.border}`,borderRadius:10,fontSize:12,color:t.text}}/>
-              <Legend wrapperStyle={{fontSize:12,color:t.textMuted}}/>
-              {[["health","#f59e0b"],["life","#60a5fa"],["car","#34d399"],["home","#f87171"]].map(([k,c])=>(
-                <Area key={k} type="monotone" dataKey={k} stroke={c} fill={`url(#g${k})`} strokeWidth={2} name={k.charAt(0).toUpperCase()+k.slice(1)}/>
-              ))}
-            </AreaChart>
-          </ResponsiveContainer>
-        </Section>
-        <Section t={t} title="Policy Mix">
-          <ResponsiveContainer width="100%" height={210}>
-            <PieChart>
-              <Pie data={policyMix} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value">
-                {policyMix.map((_,i)=><Cell key={i} fill={PIE_COLORS[i]}/>)}
-              </Pie>
-              <Tooltip contentStyle={{background:t.tooltip,border:`1px solid ${t.border}`,borderRadius:10,fontSize:12,color:t.text}}/>
-              <Legend wrapperStyle={{fontSize:12,color:t.textMuted}}/>
-            </PieChart>
-          </ResponsiveContainer>
-        </Section>
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12 }}>
+        <StatCard t={t} label="Total Policies" value={polData.length} icon="📋" sub={`${polData.filter(p=>p.status==="Active").length} Active`} color="bg-emerald-500/20 text-emerald-400"/>
+        <StatCard t={t} label="Total Premium" value={fmt(totalPremium)} icon="💰" sub={`Net: ${fmt(totalNetPrm)}`} color="bg-amber-500/20 text-amber-400"/>
+        <StatCard t={t} label="Total GST" value={fmt(totalGST)} icon="🏛️" sub="Collected" color="bg-blue-500/20 text-blue-400"/>
+        <StatCard t={t} label="Renewal Due" value={renewalDue.length} icon="⚠️" sub="Action needed" color="bg-red-500/20 text-red-400"/>
+        <StatCard t={t} label="Total Clients" value={clientData.length} icon="👥" sub="Registered" color="bg-purple-500/20 text-purple-400"/>
+        <StatCard t={t} label="This Month" value={monthlyPolicies.length} icon="📅" sub="New policies" color="bg-cyan-500/20 text-cyan-400"/>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-        <Section t={t} title="Claims Overview (Last 6 Months)">
-          <ResponsiveContainer width="100%" height={170}>
-            <BarChart data={claimsData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={t.chartGrid}/>
-              <XAxis dataKey="month" tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
-              <YAxis tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
-              <Tooltip contentStyle={{background:t.tooltip,border:`1px solid ${t.border}`,borderRadius:10,fontSize:12,color:t.text}}/>
-              <Legend wrapperStyle={{fontSize:12,color:t.textMuted}}/>
-              <Bar dataKey="filed" name="Filed" fill="#60a5fa" radius={[4,4,0,0]}/>
-              <Bar dataKey="approved" name="Approved" fill="#34d399" radius={[4,4,0,0]}/>
-              <Bar dataKey="rejected" name="Rejected" fill="#f87171" radius={[4,4,0,0]}/>
-            </BarChart>
-          </ResponsiveContainer>
+        <Section t={t} title={`⏳ Expiring in 30 Days (${upcoming.length})`}>
+          {upcoming.length===0
+            ? <p style={{ color:t.textMuted, fontSize:13, textAlign:"center", padding:20 }}>✅ Koi policy expire hone wali nahi agle 30 din mein</p>
+            : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {upcoming.map(p=>{ const d=daysUntil(p.expiry); const col=d<=7?"#f87171":d<=15?"#f59e0b":"#34d399";
+                  return (
+                    <div key={p.id} style={{ background:t.inputBg, borderRadius:10, padding:"9px 12px" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                        <span style={{ fontSize:12, fontWeight:700, color:t.text }}>{p.client}</span>
+                        <span style={{ fontSize:11, fontWeight:800, color:col }}>{d}d left</span>
+                      </div>
+                      <div style={{ display:"flex", justifyContent:"space-between" }}>
+                        <span style={{ fontSize:11, color:t.textMuted }}>{p.department||p.type} · {p.expiry}</span>
+                        <span style={{ fontSize:11, color:"#f59e0b" }}>{fmtINR(p.premium)}</span>
+                      </div>
+                      <div style={{ height:2, background:t.border, borderRadius:99, marginTop:5 }}>
+                        <div style={{ width:`${Math.max(5,(d/30)*100)}%`, height:"100%", background:col, borderRadius:99 }}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+          }
         </Section>
-        <Section t={t} title="⏳ Expiry Countdown">
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {polData.filter(p=>p.status!=="Lapsed").sort((a,b)=>daysUntil(a.expiry)-daysUntil(b.expiry)).slice(0,5).map(p=>{
-              const d=daysUntil(p.expiry); const col=d<=15?"#f87171":d<=45?"#f59e0b":"#34d399";
-              return (
-                <div key={p.id} style={{ background:t.inputBg, borderRadius:10, padding:"9px 12px" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5 }}>
-                    <span style={{ fontSize:12, fontWeight:600, color:t.text }}>{typeIcon(p.type)} {p.client}</span>
-                    <span style={{ fontSize:11, fontWeight:700, color:col }}>{d<0?"Expired":`${d}d`}</span>
-                  </div>
-                  <div style={{ height:3, background:t.border, borderRadius:99 }}>
-                    <div style={{ width:`${Math.min(100,Math.max(5,((365-d)/365)*100))}%`, height:"100%", background:col, borderRadius:99 }}/>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <Section t={t} title="📊 Department Breakdown">
+          {deptBreakdown.length===0
+            ? <p style={{ color:t.textMuted, fontSize:13, textAlign:"center", padding:20 }}>Data import karo — breakdown dikhega</p>
+            : <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                {deptBreakdown.map(([dept,count])=>{
+                  const pct=Math.round((count/polData.length)*100);
+                  const col=dept.includes("CAR")||dept.includes("TW")?"#34d399":dept.includes("MEDI")||dept.includes("HEALTH")?"#f59e0b":dept.includes("LIFE")?"#60a5fa":"#a78bfa";
+                  return (
+                    <div key={dept} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <span style={{ fontSize:11, color:t.text, minWidth:110, fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{dept}</span>
+                      <div style={{ flex:1, height:6, background:t.border, borderRadius:99 }}>
+                        <div style={{ width:`${pct}%`, height:"100%", background:col, borderRadius:99 }}/>
+                      </div>
+                      <span style={{ fontSize:11, color:t.textMuted, minWidth:55, textAlign:"right" }}>{count} ({pct}%)</span>
+                    </div>
+                  );
+                })}
+              </div>
+          }
         </Section>
       </div>
       {renewalDue.length>0&&(
-        <Section t={t} title="🔔 Renewal Alerts">
+        <Section t={t} title={`🔔 Renewal Alerts (${renewalDue.length})`}>
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {renewalDue.map(p=>(
-              <div key={p.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:t.inputBg, borderRadius:12, padding:"10px 14px" }}>
+            {renewalDue.slice(0,8).map(p=>(
+              <div key={p.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:t.inputBg, borderRadius:12, padding:"10px 14px", flexWrap:"wrap", gap:8 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                   <span style={{ fontSize:18 }}>{typeIcon(p.type)}</span>
-                  <div><p style={{ fontSize:13, fontWeight:600, color:t.text }}>{p.client}</p><p style={{ fontSize:11, color:t.textMuted }}>{p.id} · Expires {p.expiry}</p></div>
+                  <div>
+                    <p style={{ fontSize:13, fontWeight:700, color:t.text }}>{p.client}</p>
+                    <p style={{ fontSize:11, color:t.textMuted }}>{p.policyNo||p.id} · {p.department||p.type} · {p.expiry}</p>
+                  </div>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-semibold ${statusColor(p.status)}`}>{p.status}</span>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:12, color:"#f59e0b", fontWeight:700 }}>{fmtINR(p.premium)}</span>
+                  <span className={`text-xs px-2 py-1 rounded-full font-semibold ${statusColor(p.status)}`}>{p.status}</span>
+                </div>
               </div>
             ))}
           </div>
         </Section>
       )}
+      <Section t={t} title="📋 Recent Policies">
+        <Table t={t} headers={["Policy No.","Client","Dept.","Premium","Effective","Expiry","Status"]}
+          rows={polData.slice(0,8).map(p=>[
+            <span style={{ fontFamily:"monospace", color:"#f59e0b", fontSize:11 }}>{p.policyNo||p.id}</span>,
+            <span style={{ fontWeight:600, color:t.text }}>{p.client}</span>,
+            <span style={{ color:t.textMuted, fontSize:11 }}>{p.department||p.type}</span>,
+            <span style={{ color:t.text }}>{fmtINR(p.premium)}</span>,
+            <span style={{ color:t.textMuted, fontSize:11 }}>{p.effectiveDate||"—"}</span>,
+            <span style={{ color:t.textMuted, fontSize:11 }}>{p.expiry}</span>,
+            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor(p.status)}`}>{p.status}</span>,
+          ])}
+        />
+      </Section>
     </div>
   );
 };
 
 // ── POLICIES PAGE ─────────────────────────────────────────────────────────────
 const PoliciesPage = ({ t, data, setData }) => {
-  const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
-  const [modal, setModal] = useState(null); // null | "add" | policy obj
-  const [form, setForm] = useState({ policyNo:"", client:"", contact:"", department:"", type:"Health", effectiveDate:"", expiry:"", netPremium:"", gst:"", premium:"", commisionable:"", income:"", status:"Active", risk:"Low", docLink:"" });
-
+  const [modal, setModal] = useState(null);
+  const [docModal, setDocModal] = useState(null); // for doc upload
+  const emptyForm = { policyNo:"", client:"", contact:"", department:"", type:"Health", effectiveDate:"", expiry:"", netPremium:"", gst:"", premium:"", commisionable:"", income:"", status:"Active", risk:"Low", docLink:"", year:"", month:"" };
+  const [form, setForm] = useState(emptyForm);
+  const [typeF, setTypeF] = useState("All");
   const [statusF, setStatusF] = useState("All");
   const [riskF, setRiskF] = useState("All");
+  const [yearF, setYearF] = useState("All");
+  const [monthF, setMonthF] = useState("All");
+  const [dayF, setDayF] = useState("");
   const f = v => setForm(p=>({...p,...v}));
-  const types=["All","Health","Life","Car","Home"];
-  const filtered = data.filter(p=>
-    (filter==="All"||p.type===filter)&&
-    (statusF==="All"||p.status===statusF)&&
-    (riskF==="All"||p.risk===riskF)&&
-    (search===""||p.client.toLowerCase().includes(search.toLowerCase())||
-     (p.policyNo||"").toLowerCase().includes(search.toLowerCase())||
-     (p.contact||"").includes(search))
-  );
 
-  const openAdd = () => { setForm({ policyNo:"", client:"", contact:"", department:"", type:"Health", effectiveDate:"", expiry:"", netPremium:"", gst:"", premium:"", commisionable:"", income:"", status:"Active", risk:"Low", docLink:"" }); setModal("add"); };
-  const openEdit = (p) => { setForm({...p, premium:String(p.premium||""), netPremium:String(p.netPremium||""), gst:String(p.gst||""), income:String(p.income||""), docLink:p.docLink||"" }); setModal(p); };
+  // Get unique years and months from data
+  const years = ["All", ...Array.from(new Set(data.map(p=>p.effectiveDate?.slice(0,4)||p.year||"").filter(Boolean))).sort().reverse()];
+  const months = ["All","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTH_MAP = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+
+  const filtered = data.filter(p=>{
+    const effDate = p.effectiveDate||"";
+    const pYear = effDate.slice(0,4)||p.year||"";
+    const pMonth = effDate ? new Date(effDate).getMonth() : -1;
+    const pDay = effDate.slice(8,10)||"";
+    return (
+      (typeF==="All"||p.type===typeF||p.department===typeF)&&
+      (statusF==="All"||p.status===statusF)&&
+      (riskF==="All"||p.risk===riskF)&&
+      (yearF==="All"||pYear===yearF)&&
+      (monthF==="All"||pMonth===MONTH_MAP[monthF])&&
+      (dayF===""||pDay===dayF.padStart(2,"0"))&&
+      (search===""||
+        p.client?.toLowerCase().includes(search.toLowerCase())||
+        (p.policyNo||"").toLowerCase().includes(search.toLowerCase())||
+        (p.contact||"").includes(search)||
+        (p.department||"").toLowerCase().includes(search.toLowerCase()))
+    );
+  });
+
+  const openAdd = () => { setForm(emptyForm); setModal("add"); };
+  const openEdit = (p) => { setForm({...emptyForm,...p, premium:String(p.premium||""), netPremium:String(p.netPremium||""), gst:String(p.gst||""), income:String(p.income||"")}); setModal(p); };
   const save = () => {
-    if (!form.client||!form.premium||!form.expiry) return;
-    if (modal==="add") setData(d=>[...d,{...form, id:uid("POL"), premium:Number(form.premium)}]);
-    else setData(d=>d.map(p=>p.id===modal.id?{...form,id:modal.id,premium:Number(form.premium)}:p));
+    if (!form.client||!form.premium) return;
+    const item = {...form, premium:Number(form.premium)||0, netPremium:Number(form.netPremium)||0, gst:Number(form.gst)||0, income:Number(form.income)||0,
+      year:form.effectiveDate?.slice(0,4)||form.year||"",
+      month:form.effectiveDate?new Date(form.effectiveDate).toLocaleString("default",{month:"short"}):form.month||""
+    };
+    if (modal==="add") setData(d=>[...d,{...item, id:uid("POL")}]);
+    else setData(d=>d.map(p=>p.id===modal.id?{...item,id:modal.id}:p));
     setModal(null);
   };
   const del = (id) => setData(d=>d.filter(p=>p.id!==id));
 
+  // Doc upload handler
+  const handleDocUpload = (policyId, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      setData(d=>d.map(p=>p.id===policyId?{...p, docLink:dataUrl, docName:file.name}:p));
+      setDocModal(null);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Get unique depts for filter
+  const depts = ["All", ...Array.from(new Set(data.map(p=>p.department||p.type).filter(Boolean))).sort()];
+
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      {/* Year / Month / Day Filters */}
+      <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:14, padding:14, display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+          <span style={{ fontSize:11, fontWeight:700, color:t.textMuted, minWidth:50 }}>📅 YEAR:</span>
+          {years.map(y=>(
+            <button key={y} onClick={()=>setYearF(y)}
+              style={{ border:yearF===y?"none":`1px solid ${t.border}`, background:yearF===y?"#f59e0b":"transparent", color:yearF===y?"#000":t.textMuted, borderRadius:99, padding:"3px 12px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{y}</button>
+          ))}
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+          <span style={{ fontSize:11, fontWeight:700, color:t.textMuted, minWidth:50 }}>📆 MONTH:</span>
+          {months.map(m=>(
+            <button key={m} onClick={()=>setMonthF(m)}
+              style={{ border:monthF===m?"none":`1px solid ${t.border}`, background:monthF===m?"#60a5fa":"transparent", color:monthF===m?"#000":t.textMuted, borderRadius:99, padding:"3px 10px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{m}</button>
+          ))}
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+          <span style={{ fontSize:11, fontWeight:700, color:t.textMuted, minWidth:50 }}>🗓️ DAY:</span>
+          <input value={dayF} onChange={e=>setDayF(e.target.value.replace(/\D/g,"").slice(0,2))} placeholder="DD (1-31)"
+            style={{ background:t.input, border:`1px solid ${dayF?`rgba(96,165,250,0.5)`:t.inputBorder}`, borderRadius:8, padding:"4px 10px", fontSize:12, color:t.text, outline:"none", width:90 }}/>
+          {dayF&&<button onClick={()=>setDayF("")} style={{ background:"none", border:"none", color:t.textMuted, cursor:"pointer", fontSize:16 }}>×</button>}
+          <span style={{ fontSize:11, color:t.textMuted }}>Filtered: <strong style={{ color:t.text }}>{filtered.length}</strong> records</span>
+        </div>
+      </div>
+
+      {/* Type/Status/Risk Filters */}
       <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-        {types.map(tp=>(
-          <button key={tp} onClick={()=>setFilter(tp)}
-            style={{ border:filter===tp?"none":`1px solid ${t.border}`, background:filter===tp?"#f59e0b":"transparent", color:filter===tp?"#000":t.textMuted, borderRadius:99, padding:"5px 14px", fontSize:12, fontWeight:600, cursor:"pointer" }}>{tp}</button>
+        {depts.slice(0,8).map(d=>(
+          <button key={d} onClick={()=>setTypeF(d)}
+            style={{ border:typeF===d?"none":`1px solid ${t.border}`, background:typeF===d?"#a78bfa":"transparent", color:typeF===d?"#000":t.textMuted, borderRadius:99, padding:"4px 12px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{d}</button>
         ))}
       </div>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
         {["All","Active","Renewal Due","Lapsed"].map(s=>(
           <button key={s} onClick={()=>setStatusF(s)}
-            style={{ border:statusF===s?"none":`1px solid ${t.border}`, background:statusF===s?"#60a5fa":"transparent", color:statusF===s?"#000":t.textMuted, borderRadius:99, padding:"4px 12px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{s}</button>
+            style={{ border:statusF===s?"none":`1px solid ${t.border}`, background:statusF===s?"#f59e0b":"transparent", color:statusF===s?"#000":t.textMuted, borderRadius:99, padding:"4px 12px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{s}</button>
         ))}
-        <span style={{ width:1, background:t.border, margin:"0 4px" }}/>
         {["All","Low","Medium","High"].map(r=>(
           <button key={r} onClick={()=>setRiskF(r)}
-            style={{ border:riskF===r?"none":`1px solid ${t.border}`, background:riskF===r?r==="Low"?"#34d399":r==="Medium"?"#f59e0b":"#f87171":"transparent", color:riskF===r?"#000":t.textMuted, borderRadius:99, padding:"4px 12px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{r==="All"?"All Risk":r+" Risk"}</button>
+            style={{ border:riskF===r?"none":`1px solid ${t.border}`, background:riskF===r?r==="Low"?"#34d399":r==="Medium"?"#f59e0b":"#f87171":"transparent", color:riskF===r?"#000":t.textMuted, borderRadius:99, padding:"4px 12px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{r==="All"?"All Risk":`${r} Risk`}</button>
         ))}
       </div>
+
       <Section t={t} title={`Policies (${filtered.length})`} action="+ New Policy" onAction={openAdd}>
-        <SearchBar value={search} onChange={setSearch} placeholder="Search by name or policy ID..." t={t}/>
-        <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
-          <button onClick={()=>exportCSV(filtered.map(p=>({...p})),"policies.csv")} style={{ fontSize:11, color:t.textMuted, background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer" }}>📤 CSV</button>
-          <button onClick={()=>exportPDF("Policy Report",filtered,[{key:"id",label:"Policy ID"},{key:"client",label:"Client"},{key:"type",label:"Type"},{key:"premium",label:"Premium"},{key:"status",label:"Status"},{key:"expiry",label:"Expiry"},{key:"risk",label:"Risk"}])} style={{ fontSize:11, color:t.textMuted, background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer" }}>🖨️ PDF</button>
+        <SearchBar value={search} onChange={setSearch} placeholder="Search by name, policy no, contact, department..." t={t}/>
+        <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+          <button onClick={()=>exportCSV(filtered,"policies.csv")} style={{ fontSize:11, color:t.textMuted, background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer" }}>📤 CSV</button>
+          <button onClick={()=>exportPDF("Policy Report",filtered,[{key:"policyNo",label:"Policy No."},{key:"client",label:"Client"},{key:"contact",label:"Contact"},{key:"department",label:"Dept."},{key:"effectiveDate",label:"Eff.Date"},{key:"expiry",label:"Expiry"},{key:"netPremium",label:"Net Prm."},{key:"gst",label:"GST"},{key:"premium",label:"Total Prm."},{key:"income",label:"Income%"},{key:"status",label:"Status"}])} style={{ fontSize:11, color:t.textMuted, background:t.inputBg, border:`1px solid ${t.border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer" }}>🖨️ PDF</button>
         </div>
-        <Table t={t} headers={["Policy No.","Client","Contact","Dept.","Type","Eff. Date","Expiry","Days","Net Prm.","GST","Total Prm.","Commission%","Status","Risk","Doc","Actions"]}
+        <Table t={t} headers={["Policy No.","Client","Contact","Dept.","Eff. Date","Expiry","Days","Net Prm.","GST","Total Prm.","Inc%","Status","Risk","Doc","Actions"]}
           rows={filtered.map(p=>{
             const d=daysUntil(p.expiry); const dc=d<15?"#f87171":d<45?"#f59e0b":"#34d399";
+            const hasDoc = p.docLink&&p.docLink.length>0;
             return [
               <span style={{ fontFamily:"monospace", color:"#f59e0b", fontSize:11, whiteSpace:"nowrap" }}>{p.policyNo||p.id}</span>,
               <span style={{ fontWeight:600, color:t.text, whiteSpace:"nowrap" }}>{p.client}</span>,
               <span style={{ color:t.textMuted, fontSize:11 }}>{p.contact||"—"}</span>,
               <span style={{ color:t.textMuted, fontSize:11, whiteSpace:"nowrap" }}>{p.department||p.type}</span>,
-              <span style={{ color:t.textMuted, fontSize:11 }}>{typeIcon(p.type)} {p.type}</span>,
               <span style={{ color:t.textMuted, fontSize:11, whiteSpace:"nowrap" }}>{p.effectiveDate||"—"}</span>,
               <span style={{ color:t.textMuted, fontSize:11, whiteSpace:"nowrap" }}>{p.expiry}</span>,
               <span style={{ color:dc, fontWeight:700, fontSize:11 }}>{d<0?"Expired":`${d}d`}</span>,
@@ -416,23 +455,31 @@ const PoliciesPage = ({ t, data, setData }) => {
               <span style={{ color:t.text, fontWeight:600 }}>{fmtINR(p.premium)}</span>,
               <span style={{ color:"#34d399", fontSize:11, fontWeight:600 }}>{p.income!=null&&p.income!==""?`${p.income}%`:"—"}</span>,
               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor(p.status)}`}>{p.status}</span>,
-              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${p.risk==="Low"?"text-emerald-400 bg-emerald-500/10":p.risk==="Medium"?"text-amber-400 bg-amber-500/10":"text-red-400 bg-red-500/10"}`}>{p.risk}</span>,
-              p.docLink
-                ? <a href={p.docLink} target="_blank" rel="noopener noreferrer"
-                    style={{ display:"inline-flex", alignItems:"center", gap:4, background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.35)", borderRadius:7, padding:"3px 9px", fontSize:11, color:"#60a5fa", textDecoration:"none", fontWeight:600, whiteSpace:"nowrap" }}>
-                    📄 View
-                  </a>
-                : <span style={{ fontSize:11, color:t.textMuted, opacity:0.4 }}>—</span>,
-              <div style={{ display:"flex", gap:6 }}>
-                <button onClick={()=>openEdit(p)} style={{ fontSize:11, padding:"3px 8px", background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:6, color:"#60a5fa", cursor:"pointer" }}>✏️</button>
-                <button onClick={()=>del(p.id)} style={{ fontSize:11, padding:"3px 8px", background:"rgba(248,113,113,0.15)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:6, color:"#f87171", cursor:"pointer" }}>🗑️</button>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${p.risk==="Low"?"text-emerald-400 bg-emerald-500/10":p.risk==="Medium"?"text-amber-400 bg-amber-500/10":"text-red-400 bg-red-500/10"}`}>{p.risk||"—"}</span>,
+              <div style={{ display:"flex", gap:4 }}>
+                {hasDoc
+                  ? <a href={p.docLink} target="_blank" rel="noopener noreferrer" title={p.docName||"View Document"}
+                      style={{ display:"inline-flex", alignItems:"center", gap:3, background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.35)", borderRadius:7, padding:"3px 7px", fontSize:10, color:"#60a5fa", textDecoration:"none", fontWeight:600 }}>
+                      📄 View
+                    </a>
+                  : null}
+                <button onClick={()=>setDocModal(p)} title="Upload Document"
+                  style={{ fontSize:10, padding:"3px 7px", background:"rgba(167,139,250,0.15)", border:"1px solid rgba(167,139,250,0.3)", borderRadius:7, color:"#a78bfa", cursor:"pointer", fontWeight:600 }}>
+                  {hasDoc?"🔄":"📎"}
+                </button>
+              </div>,
+              <div style={{ display:"flex", gap:5 }}>
+                <button onClick={()=>openEdit(p)} style={{ fontSize:10, padding:"3px 7px", background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:6, color:"#60a5fa", cursor:"pointer" }}>✏️</button>
+                <button onClick={()=>del(p.id)} style={{ fontSize:10, padding:"3px 7px", background:"rgba(248,113,113,0.15)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:6, color:"#f87171", cursor:"pointer" }}>🗑️</button>
               </div>
             ];
           })}
         />
       </Section>
+
+      {/* Add/Edit Modal */}
       {modal&&(
-        <Modal title={modal==="add"?"Add New Policy":`Edit — ${modal.policyNo||modal.id}`} onClose={()=>setModal(null)} t={t}>
+        <Modal title={modal==="add"?"Add New Policy":`Edit — ${modal.policyNo||modal.id||""}`} onClose={()=>setModal(null)} t={t}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"0 16px" }}>
             <Field label="Policy No." value={form.policyNo||""} onChange={v=>f({policyNo:v})} t={t}/>
             <Field label="Client Name" value={form.client} onChange={v=>f({client:v})} t={t} required/>
@@ -440,31 +487,51 @@ const PoliciesPage = ({ t, data, setData }) => {
             <Field label="Department" value={form.department||""} onChange={v=>f({department:v})} t={t}/>
             <Field label="Insurance Type" value={form.type} onChange={v=>f({type:v})} options={["Health","Life","Car","Home"]} t={t}/>
             <Field label="Status" value={form.status} onChange={v=>f({status:v})} options={["Active","Renewal Due","Lapsed"]} t={t}/>
-            <Field label="Effective Date" value={form.effectiveDate||""} onChange={v=>f({effectiveDate:v})} type="date" t={t}/>
-            <Field label="Expiry Date" value={form.expiry} onChange={v=>f({expiry:v})} type="date" t={t} required/>
+            <Field label="Effective Date (dd/mm/yyyy)" value={form.effectiveDate||""} onChange={v=>f({effectiveDate:normalizeDate(v)})} t={t}/>
+            <Field label="Expiry Date (dd/mm/yyyy)" value={form.expiry||""} onChange={v=>f({expiry:normalizeDate(v)})} t={t} required/>
             <Field label="Net Premium (₹)" value={String(form.netPremium||"")} onChange={v=>f({netPremium:v})} type="number" t={t}/>
             <Field label="GST (₹)" value={String(form.gst||"")} onChange={v=>f({gst:v})} type="number" t={t}/>
-            <Field label="Total Premium (₹)" value={String(form.premium)} onChange={v=>f({premium:v})} type="number" t={t} required/>
+            <Field label="Total Premium (₹)" value={String(form.premium||"")} onChange={v=>f({premium:v})} type="number" t={t} required/>
             <Field label="Income / Commission %" value={String(form.income||"")} onChange={v=>f({income:v})} type="number" t={t}/>
             <Field label="Risk Level" value={form.risk} onChange={v=>f({risk:v})} options={["Low","Medium","High"]} t={t}/>
           </div>
           <div style={{ marginBottom:14 }}>
-            <label style={{ display:"block", fontSize:11, fontWeight:600, color:t.textMuted, marginBottom:5, textTransform:"uppercase", letterSpacing:"0.05em" }}>Policy Document Link (URL)</label>
-            <div style={{ display:"flex", gap:8 }}>
-              <input value={form.docLink||""} onChange={e=>f({docLink:e.target.value})} placeholder="https://drive.google.com/... ya koi bhi link"
-                style={{ flex:1, background:t.input, border:`1px solid ${form.docLink?"rgba(96,165,250,0.5)":t.inputBorder}`, borderRadius:10, padding:"9px 12px", fontSize:13, color:t.text, outline:"none" }}/>
-              {form.docLink && (
-                <a href={form.docLink} target="_blank" rel="noopener noreferrer"
-                  style={{ background:"rgba(96,165,250,0.15)", border:"1px solid rgba(96,165,250,0.3)", borderRadius:10, padding:"9px 14px", color:"#60a5fa", fontSize:12, fontWeight:700, textDecoration:"none", display:"flex", alignItems:"center" }}>
-                  📄 Test
-                </a>
-              )}
-            </div>
-            <p style={{ fontSize:10, color:t.textMuted, marginTop:4 }}>Google Drive, OneDrive, Dropbox, ya koi bhi public link</p>
+            <label style={{ display:"block", fontSize:11, fontWeight:600, color:t.textMuted, marginBottom:5, textTransform:"uppercase" }}>Policy Document Link (URL)</label>
+            <input value={form.docLink||""} onChange={e=>f({docLink:e.target.value})} placeholder="https://drive.google.com/..."
+              style={{ width:"100%", background:t.input, border:`1px solid ${t.inputBorder}`, borderRadius:10, padding:"9px 12px", fontSize:13, color:t.text, outline:"none", boxSizing:"border-box" }}/>
           </div>
           <div style={{ display:"flex", gap:10, justifyContent:"flex-end", marginTop:8 }}>
             <Btn onClick={()=>setModal(null)} outline color={t.textMuted} t={t}>Cancel</Btn>
             <Btn onClick={save} t={t}>{modal==="add"?"Add Policy":"Save Changes"}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Doc Upload Modal */}
+      {docModal&&(
+        <Modal title={`📎 Upload Document — ${docModal.client}`} onClose={()=>setDocModal(null)} t={t}>
+          <div style={{ textAlign:"center", padding:"20px 0" }}>
+            <div style={{ fontSize:48, marginBottom:12 }}>📄</div>
+            <p style={{ color:t.text, fontWeight:600, marginBottom:6 }}>Policy Document Upload karo</p>
+            <p style={{ color:t.textMuted, fontSize:12, marginBottom:20 }}>PDF, Image — koi bhi format chalta hai<br/>File browser mein save hogi (max ~2MB recommended)</p>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={e=>handleDocUpload(docModal.id, e.target.files[0])}
+              style={{ display:"none" }} id="docUploadInput"/>
+            <label htmlFor="docUploadInput"
+              style={{ display:"inline-block", background:"linear-gradient(135deg,#a78bfa,#7c3aed)", border:"none", borderRadius:12, padding:"12px 28px", fontSize:13, fontWeight:700, color:"#fff", cursor:"pointer" }}>
+              📂 File Choose karo
+            </label>
+            <div style={{ marginTop:16 }}>
+              <p style={{ color:t.textMuted, fontSize:11, marginBottom:6 }}>Ya Google Drive link paste karo:</p>
+              <div style={{ display:"flex", gap:8 }}>
+                <input placeholder="https://drive.google.com/..." id="docLinkInput"
+                  style={{ flex:1, background:t.input, border:`1px solid ${t.inputBorder}`, borderRadius:10, padding:"9px 12px", fontSize:13, color:t.text, outline:"none" }}/>
+                <button onClick={()=>{
+                    const val = document.getElementById("docLinkInput").value;
+                    if (val) { setData(d=>d.map(p=>p.id===docModal.id?{...p,docLink:val,docName:"Drive Link"}:p)); setDocModal(null); }
+                  }}
+                  style={{ background:"linear-gradient(135deg,#f59e0b,#ea580c)", border:"none", borderRadius:10, padding:"9px 16px", color:"#000", fontWeight:700, fontSize:13, cursor:"pointer" }}>Save</button>
+              </div>
+            </div>
           </div>
         </Modal>
       )}
@@ -953,117 +1020,137 @@ const Calculator = ({ t }) => {
 };
 
 // ── ANALYTICS ─────────────────────────────────────────────────────────────────
-const AnalyticsPage = ({ t }) => {
-  const [typeF, setTypeF] = useState("All");
-  const keys = typeF==="All" ? ["health","life","car","home"] : [typeF.toLowerCase()];
-  const colors = { health:"#f59e0b", life:"#60a5fa", car:"#34d399", home:"#f87171" };
+const AnalyticsPage = ({ t, polData, payData }) => {
+  const [yearF, setYearF] = useState("All");
+  const [monthF, setMonthF] = useState("All");
+  const MONTHS = ["All","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTH_MAP = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+  const years = ["All", ...Array.from(new Set(polData.map(p=>p.effectiveDate?.slice(0,4)||p.year||"").filter(Boolean))).sort().reverse()];
+
+  const filtered = polData.filter(p=>{
+    const yr = p.effectiveDate?.slice(0,4)||p.year||"";
+    const mo = p.effectiveDate ? new Date(p.effectiveDate).getMonth() : -1;
+    return (yearF==="All"||yr===yearF)&&(monthF==="All"||mo===MONTH_MAP[monthF]);
+  });
+
+  const totalPremium = filtered.reduce((s,p)=>s+(Number(p.premium)||0),0);
+  const totalNet = filtered.reduce((s,p)=>s+(Number(p.netPremium)||0),0);
+  const totalGST = filtered.reduce((s,p)=>s+(Number(p.gst)||0),0);
+  const totalIncome = filtered.reduce((s,p)=>s+(Number(p.netPremium||0)*Number(p.income||0)/100),0);
+
+  // Month-wise summary from real data
+  const monthSummary = {};
+  filtered.forEach(p=>{
+    const mo = p.effectiveDate?new Date(p.effectiveDate).toLocaleString("default",{month:"short"}):p.month||"Unknown";
+    if (!monthSummary[mo]) monthSummary[mo]={count:0,premium:0,net:0,gst:0};
+    monthSummary[mo].count++;
+    monthSummary[mo].premium += Number(p.premium)||0;
+    monthSummary[mo].net += Number(p.netPremium)||0;
+    monthSummary[mo].gst += Number(p.gst)||0;
+  });
+
+  // Dept summary
+  const deptSummary = {};
+  filtered.forEach(p=>{ const k=p.department||p.type||"Other"; if(!deptSummary[k]) deptSummary[k]={count:0,premium:0}; deptSummary[k].count++; deptSummary[k].premium+=Number(p.premium)||0; });
+
   return (
-  <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-    <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-      {["All","Health","Life","Car","Home"].map(tp=>(
-        <button key={tp} onClick={()=>setTypeF(tp)}
-          style={{ border:typeF===tp?"none":`1px solid ${t.border}`, background:typeF===tp?"#f59e0b":"transparent", color:typeF===tp?"#000":t.textMuted, borderRadius:99, padding:"5px 14px", fontSize:12, fontWeight:600, cursor:"pointer" }}>{tp==="All"?"All Types":`${typeIcon(tp)} ${tp}`}</button>
-      ))}
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+        {years.map(y=><button key={y} onClick={()=>setYearF(y)} style={{ border:yearF===y?"none":`1px solid ${t.border}`, background:yearF===y?"#f59e0b":"transparent", color:yearF===y?"#000":t.textMuted, borderRadius:99, padding:"4px 12px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{y}</button>)}
+      </div>
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+        {MONTHS.map(m=><button key={m} onClick={()=>setMonthF(m)} style={{ border:monthF===m?"none":`1px solid ${t.border}`, background:monthF===m?"#60a5fa":"transparent", color:monthF===m?"#000":t.textMuted, borderRadius:99, padding:"4px 10px", fontSize:11, fontWeight:600, cursor:"pointer" }}>{m}</button>)}
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:12 }}>
+        <StatCard t={t} label="Policies" value={filtered.length} icon="📋" sub="In selection" color="bg-blue-500/20 text-blue-400"/>
+        <StatCard t={t} label="Total Premium" value={fmt(totalPremium)} icon="💰" sub="Gross" color="bg-amber-500/20 text-amber-400"/>
+        <StatCard t={t} label="Net Premium" value={fmt(totalNet)} icon="📊" sub="Net" color="bg-emerald-500/20 text-emerald-400"/>
+        <StatCard t={t} label="GST Collected" value={fmt(totalGST)} icon="🏛️" sub="Tax" color="bg-purple-500/20 text-purple-400"/>
+        <StatCard t={t} label="Est. Income" value={fmt(totalIncome)} icon="💸" sub="Commission" color="bg-cyan-500/20 text-cyan-400"/>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+        <Section t={t} title="📅 Month-wise Summary">
+          <Table t={t} headers={["Month","Policies","Total Prm.","Net Prm.","GST"]}
+            rows={Object.entries(monthSummary).map(([mo,d])=>[
+              <span style={{ fontWeight:600, color:t.text }}>{mo}</span>,
+              <span style={{ color:t.text }}>{d.count}</span>,
+              <span style={{ color:"#f59e0b", fontWeight:600 }}>{fmtINR(d.premium)}</span>,
+              <span style={{ color:"#34d399" }}>{fmtINR(d.net)}</span>,
+              <span style={{ color:"#60a5fa" }}>{fmtINR(d.gst)}</span>,
+            ])}
+          />
+        </Section>
+        <Section t={t} title="🏷️ Department-wise Summary">
+          <Table t={t} headers={["Department","Policies","Total Premium","Share%"]}
+            rows={Object.entries(deptSummary).sort((a,b)=>b[1].premium-a[1].premium).map(([dept,d])=>{
+              const pct=Math.round((d.count/filtered.length)*100)||0;
+              return [
+                <span style={{ fontWeight:600, color:t.text }}>{dept}</span>,
+                <span style={{ color:t.text }}>{d.count}</span>,
+                <span style={{ color:"#f59e0b", fontWeight:600 }}>{fmtINR(d.premium)}</span>,
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:50, height:4, background:t.border, borderRadius:99 }}>
+                    <div style={{ width:`${pct}%`, height:"100%", background:"#f59e0b", borderRadius:99 }}/>
+                  </div>
+                  <span style={{ fontSize:11, color:t.textMuted }}>{pct}%</span>
+                </div>
+              ];
+            })}
+          />
+        </Section>
+      </div>
     </div>
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-      <Section t={t} title="Revenue Trend">
-        <ResponsiveContainer width="100%" height={210}>
-          <LineChart data={revenueData}>
-            <CartesianGrid strokeDasharray="3 3" stroke={t.chartGrid}/>
-            <XAxis dataKey="month" tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
-            <YAxis tickFormatter={fmt} tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
-            <Tooltip formatter={v=>fmt(v)} contentStyle={{background:t.tooltip,border:`1px solid ${t.border}`,borderRadius:10,fontSize:12,color:t.text}}/>
-            <Legend wrapperStyle={{fontSize:12,color:t.textMuted}}/>
-            {keys.map(k=>(
-              <Line key={k} type="monotone" dataKey={k} stroke={colors[k]} strokeWidth={2} dot={false} name={k.charAt(0).toUpperCase()+k.slice(1)}/>
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
-      </Section>
-      <Section t={t} title="Policy Distribution">
-        <ResponsiveContainer width="100%" height={210}>
-          <PieChart>
-            <Pie data={policyMix} cx="50%" cy="50%" outerRadius={85} paddingAngle={3} dataKey="value" label={({name,value})=>`${name} ${value}%`}>
-              {policyMix.map((_,i)=><Cell key={i} fill={PIE_COLORS[i]}/>)}
-            </Pie>
-            <Tooltip contentStyle={{background:t.tooltip,border:`1px solid ${t.border}`,borderRadius:10,fontSize:12,color:t.text}}/>
-          </PieChart>
-        </ResponsiveContainer>
-      </Section>
-    </div>
-    <Section t={t} title="Claims Analysis">
-      <ResponsiveContainer width="100%" height={190}>
-        <BarChart data={claimsData}>
-          <CartesianGrid strokeDasharray="3 3" stroke={t.chartGrid}/>
-          <XAxis dataKey="month" tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
-          <YAxis tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
-          <Tooltip contentStyle={{background:t.tooltip,border:`1px solid ${t.border}`,borderRadius:10,fontSize:12,color:t.text}}/>
-          <Legend wrapperStyle={{fontSize:12,color:t.textMuted}}/>
-          <Bar dataKey="filed" name="Filed" fill="#60a5fa" radius={[4,4,0,0]}/>
-          <Bar dataKey="approved" name="Approved" fill="#34d399" radius={[4,4,0,0]}/>
-          <Bar dataKey="rejected" name="Rejected" fill="#f87171" radius={[4,4,0,0]}/>
-        </BarChart>
-      </ResponsiveContainer>
-    </Section>
-  </div>
   );
 };
 
 // ── REGION MAP ────────────────────────────────────────────────────────────────
-const RegionPage = ({ t }) => (
-  <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12 }}>
-      <StatCard t={t} label="Active Regions" value="8" icon="🗺️" sub="Pan India" color="bg-blue-500/20 text-blue-400"/>
-      <StatCard t={t} label="Top State" value="Maharashtra" icon="🏆" sub="842 policies" color="bg-amber-500/20 text-amber-400"/>
-      <StatCard t={t} label="Top Revenue" value="₹28.4L" icon="💰" sub="Maharashtra" color="bg-emerald-500/20 text-emerald-400"/>
-      <StatCard t={t} label="Fastest Growth" value="Telangana" icon="📈" sub="↑ 22% MoM" color="bg-purple-500/20 text-purple-400"/>
-    </div>
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-      <Section t={t} title="Policies by State">
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={regionData} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" stroke={t.chartGrid} horizontal={false}/>
-            <XAxis type="number" tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
-            <YAxis type="category" dataKey="name" tick={{fill:t.textMuted,fontSize:11}} axisLine={false} tickLine={false} width={90}/>
-            <Tooltip contentStyle={{background:t.tooltip,border:`1px solid ${t.border}`,borderRadius:10,fontSize:12,color:t.text}}/>
-            <Bar dataKey="policies" name="Policies" radius={[0,6,6,0]}>{regionData.map((r,i)=><Cell key={i} fill={r.color}/>)}</Bar>
-          </BarChart>
-        </ResponsiveContainer>
+const RegionPage = ({ t, polData }) => {
+  const cityMap = {};
+  polData.forEach(p=>{
+    const city = p.city||p.contact?.slice(0,3)||"Unknown";
+    if (!cityMap[city]) cityMap[city]={count:0,premium:0};
+    cityMap[city].count++;
+    cityMap[city].premium += Number(p.premium)||0;
+  });
+  const cityData = Object.entries(cityMap).sort((a,b)=>b[1].count-a[1].count).slice(0,10);
+  const total = cityData.reduce((s,[,v])=>s+v.count,0)||1;
+  const COLORS = ["#f59e0b","#60a5fa","#34d399","#a78bfa","#f87171","#fb923c","#22d3ee","#4ade80","#e879f9","#94a3b8"];
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))", gap:12 }}>
+        <StatCard t={t} label="Total Policies" value={polData.length} icon="📋" sub="All records" color="bg-blue-500/20 text-blue-400"/>
+        <StatCard t={t} label="Departments" value={new Set(polData.map(p=>p.department||p.type)).size} icon="🏷️" sub="Types" color="bg-amber-500/20 text-amber-400"/>
+        <StatCard t={t} label="Total Premium" value={fmt(polData.reduce((s,p)=>s+(Number(p.premium)||0),0))} icon="💰" sub="Gross" color="bg-emerald-500/20 text-emerald-400"/>
+        <StatCard t={t} label="Total Net Prm." value={fmt(polData.reduce((s,p)=>s+(Number(p.netPremium)||0),0))} icon="📊" sub="Net" color="bg-purple-500/20 text-purple-400"/>
+      </div>
+      <Section t={t} title="📊 Department-wise Policy Breakdown">
+        {(() => {
+          const dm = {};
+          polData.forEach(p=>{ const k=p.department||p.type||"Other"; if(!dm[k]) dm[k]={count:0,premium:0,net:0,gst:0,income:0}; dm[k].count++; dm[k].premium+=Number(p.premium)||0; dm[k].net+=Number(p.netPremium)||0; dm[k].gst+=Number(p.gst)||0; dm[k].income+=Number(p.netPremium||0)*Number(p.income||0)/100; });
+          return (
+            <Table t={t} headers={["Department","Policies","Share","Total Prm.","Net Prm.","GST","Est. Income"]}
+              rows={Object.entries(dm).sort((a,b)=>b[1].premium-a[1].premium).map(([dept,d],i)=>{
+                const pct=Math.round((d.count/polData.length)*100);
+                return [
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}><div style={{ width:8,height:8,borderRadius:99,background:COLORS[i%10] }}/><span style={{ fontWeight:700, color:t.text }}>{dept}</span></div>,
+                  <span style={{ color:t.text }}>{d.count}</span>,
+                  <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:80 }}>
+                    <div style={{ width:40, height:5, background:t.border, borderRadius:99 }}><div style={{ width:`${pct}%`, height:"100%", background:COLORS[i%10], borderRadius:99 }}/></div>
+                    <span style={{ fontSize:10, color:t.textMuted }}>{pct}%</span>
+                  </div>,
+                  <span style={{ color:"#f59e0b", fontWeight:600 }}>{fmtINR(d.premium)}</span>,
+                  <span style={{ color:"#34d399" }}>{fmtINR(d.net)}</span>,
+                  <span style={{ color:"#60a5fa" }}>{fmtINR(d.gst)}</span>,
+                  <span style={{ color:"#a78bfa" }}>{fmtINR(d.income)}</span>,
+                ];
+              })}
+            />
+          );
+        })()}
       </Section>
-      <Section t={t} title="Revenue by State">
-        <ResponsiveContainer width="100%" height={260}>
-          <PieChart>
-            <Pie data={regionData} cx="50%" cy="50%" outerRadius={95} paddingAngle={3} dataKey="revenue" nameKey="name">
-              {regionData.map((r,i)=><Cell key={i} fill={r.color}/>)}
-            </Pie>
-            <Tooltip formatter={v=>`₹${v}L`} contentStyle={{background:t.tooltip,border:`1px solid ${t.border}`,borderRadius:10,fontSize:12,color:t.text}}/>
-            <Legend wrapperStyle={{fontSize:11,color:t.textMuted}}/>
-          </PieChart>
-        </ResponsiveContainer>
-      </Section>
     </div>
-    <Section t={t} title="State-wise Breakdown">
-      <Table t={t} headers={["State","Policies","Revenue","Market Share","Trend"]}
-        rows={regionData.map((r,i)=>{
-          const share=((r.policies/regionData.reduce((a,x)=>a+x.policies,0))*100).toFixed(1);
-          const trends=["↑14%","↑8%","↑18%","↑11%","↑6%","↑22%","↑5%","↑9%"];
-          return [
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}><div style={{ width:10,height:10,borderRadius:99,background:r.color }}/><span style={{ fontWeight:600, color:t.text }}>{r.name}</span></div>,
-            <span style={{ color:t.text }}>{r.policies.toLocaleString()}</span>,
-            <span style={{ color:t.text }}>₹{r.revenue}L</span>,
-            <div style={{ display:"flex", alignItems:"center", gap:8, minWidth:100 }}>
-              <div style={{ flex:1, height:4, background:t.border, borderRadius:99 }}>
-                <div style={{ width:`${share}%`, height:"100%", background:r.color, borderRadius:99 }}/>
-              </div>
-              <span style={{ fontSize:10, color:t.textMuted }}>{share}%</span>
-            </div>,
-            <span style={{ color:"#34d399", fontWeight:700, fontSize:12 }}>{trends[i]}</span>
-          ];
-        })}
-      />
-    </Section>
-  </div>
-);
+  );
+};
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
 const CalendarPage = ({ t }) => {
@@ -1511,49 +1598,49 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
   const ID_PREFIX = { policies:"POL", clients:"C", claims:"CLM", agents:"A", payments:"PAY" };
 
   // Parse CSV text → [{header→value}]
+  // ── PARSE CSV — handles quoted commas, \r\n, BOM ──
   const parseCSV = (text) => {
-    const lines = text.trim().split("\n").filter(Boolean);
+    // Remove BOM and normalize line endings
+    const clean = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const lines = clean.trim().split("\n").filter(l => l.trim());
     if (lines.length < 2) return [];
-    const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g,"").trim());
+
+    // Parse a single CSV line respecting quoted fields
+    const parseLine = (line) => {
+      const result = [];
+      let cur = "", inQuote = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuote && line[i+1] === '"') { cur += '"'; i++; }
+          else inQuote = !inQuote;
+        } else if (ch === ',' && !inQuote) {
+          result.push(cur.trim()); cur = "";
+        } else cur += ch;
+      }
+      result.push(cur.trim());
+      return result;
+    };
+
+    const headers = parseLine(lines[0]).map(h => h.replace(/^"|"$/g,"").trim());
     return lines.slice(1).map(line => {
-      const vals = line.match(/(".*?"|[^,]+|(?<=,)(?=,)|^(?=,)|(?<=,)$)/g) || line.split(",");
+      const vals = parseLine(line);
       const obj = {};
-      headers.forEach((h,i) => { obj[h] = (vals[i]||"").replace(/^"|"$/g,"").trim(); });
+      headers.forEach((h, i) => { obj[h] = (vals[i] || "").replace(/^"|"$/g,"").trim(); });
       return obj;
-    });
+    }).filter(row => Object.values(row).some(v => v !== ""));
   };
 
-  // ── INSURANCE TYPE NORMALIZER ──
-  const normalizeType = (val) => {
-    const v = String(val||"").toUpperCase().trim();
-    if (v.includes("TW") || v.includes("TWO") || v.includes("BIKE") || v.includes("MOTOR") || v.includes("CAR") || v.includes("AUTO") || v.includes("VEHICLE") || v.includes("PVT") || v.includes("TRUCK") || v.includes("BUS") || v.includes("TAXI")) return "Car";
-    if (v.includes("MEDICLAIM") || v.includes("HEALTH") || v.includes("MEDICAL") || v.includes("ACCIDENT") || v.includes("PA") || v.includes("CORONA") || v.includes("COVID")) return "Health";
-    if (v.includes("LIFE") || v.includes("TERM") || v.includes("ULIP") || v.includes("ENDOW") || v.includes("LIC") || v.includes("JEEVAN")) return "Life";
-    if (v.includes("HOME") || v.includes("FIRE") || v.includes("HOUSE") || v.includes("PROPERTY") || v.includes("SHOP") || v.includes("BURGLARY")) return "Home";
-    return val || "Health";
-  };
-
-  // ── STATUS NORMALIZER ──
-  const normalizeStatus = (val) => {
-    const v = String(val||"").toUpperCase().trim();
-    if (v.includes("ACTIVE") || v.includes("LIVE") || v.includes("INFORCE") || v.includes("IN FORCE") || v==="1" || v==="YES") return "Active";
-    if (v.includes("RENEW") || v.includes("DUE") || v.includes("EXPIR")) return "Renewal Due";
-    if (v.includes("LAPSE") || v.includes("CANCEL") || v.includes("VOID") || v.includes("EXPIRED") || v==="0" || v==="NO") return "Lapsed";
-    return "Active";
-  };
-
-  // ── DATE NORMALIZER (handles d.m.yyyy, dd/mm/yyyy, mm-dd-yyyy, etc.) ──
+  // ── DATE NORMALIZER — handles ALL Indian date formats ──
   const normalizeDate = (val) => {
     if (!val) return "";
-    const s = String(val).trim();
+    let s = String(val).trim().replace(/\s+/g," ");
+    if (!s || s === "0" || s.toLowerCase() === "n/a") return "";
+
     // Already YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    // d.m.yyyy or dd.mm.yyyy
-    if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(s)) {
-      const [d,m,y] = s.split(".");
-      return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
-    }
-    // dd/mm/yyyy
+
+    // dd/mm/yyyy or d/m/yyyy (Indian standard)
     if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
       const [d,m,y] = s.split("/");
       return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
@@ -1563,21 +1650,67 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
       const [d,m,y] = s.split("-");
       return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
     }
-    // Try JS Date parse as fallback
-    const dt = new Date(s);
-    if (!isNaN(dt)) return dt.toISOString().slice(0,10);
+    // dd.mm.yyyy
+    if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(s)) {
+      const [d,m,y] = s.split(".");
+      return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+    }
+    // d/m/yy → assume 20xx
+    if (/^\d{1,2}\/\d{1,2}\/\d{2}$/.test(s)) {
+      const [d,m,y] = s.split("/");
+      return `20${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+    }
+    // Excel serial number (days since 1900-01-01)
+    if (/^\d{5}$/.test(s)) {
+      const d = new Date(Date.UTC(1900,0,1) + (parseInt(s)-2)*86400000);
+      return d.toISOString().slice(0,10);
+    }
+    // Try JS Date parse as last resort
+    try {
+      const dt = new Date(s);
+      if (!isNaN(dt.getTime())) return dt.toISOString().slice(0,10);
+    } catch {}
     return s;
   };
 
-  // ── RISK NORMALIZER ──
+  // ── FORMAT DATE for display as dd/mm/yyyy ──
+  const fmtDate = (val) => {
+    if (!val) return "—";
+    const s = String(val).trim();
+    // Convert YYYY-MM-DD to dd/mm/yyyy
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [y,m,d] = s.split("-");
+      return `${d}/${m}/${y}`;
+    }
+    // If already dd/mm/yyyy
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) return s;
+    return s;
+  };
+
+  // ── INSURANCE TYPE NORMALIZER ──
+  const normalizeType = (val) => {
+    const v = String(val||"").toUpperCase().trim();
+    if (v.includes("TW")||v.includes("BIKE")||v.includes("MOTOR")||v.includes("CAR")||v.includes("AUTO")||v.includes("VEHICLE")||v.includes("PVT")||v.includes("TRUCK")||v.includes("BUS")||v.includes("TAXI")||v.includes("GCV")||v.includes("MISC")) return "Car";
+    if (v.includes("MEDICLAIM")||v.includes("HEALTH")||v.includes("MEDICAL")||v.includes("ACCIDENT")||v.includes("PA ")||v.includes("CORONA")||v.includes("COVID")||v.includes("GROUP")) return "Health";
+    if (v.includes("LIFE")||v.includes("TERM")||v.includes("ULIP")||v.includes("ENDOW")||v.includes("LIC")||v.includes("JEEVAN")) return "Life";
+    if (v.includes("HOME")||v.includes("FIRE")||v.includes("HOUSE")||v.includes("PROPERTY")||v.includes("SHOP")||v.includes("BURGLARY")||v.includes("MARINE")) return "Home";
+    return "Car"; // default for insurance companies is usually motor
+  };
+  const normalizeStatus = (val) => {
+    const v = String(val||"").toUpperCase().trim();
+    if (v.includes("ACTIVE")||v.includes("LIVE")||v.includes("INFORCE")||v.includes("IN FORCE")||v==="1"||v==="YES") return "Active";
+    if (v.includes("RENEW")||v.includes("DUE")) return "Renewal Due";
+    if (v.includes("LAPSE")||v.includes("CANCEL")||v.includes("VOID")||v.includes("EXPIR")||v==="0"||v==="NO") return "Lapsed";
+    return "Active";
+  };
   const normalizeRisk = (val) => {
     const v = String(val||"").toUpperCase().trim();
-    if (v.includes("HIGH") || v.includes("3")) return "High";
-    if (v.includes("MED") || v.includes("2")) return "Medium";
+    if (v.includes("HIGH")||v==="3") return "High";
+    if (v.includes("MED")||v==="2") return "Medium";
     return "Low";
   };
 
-  // Map parsed rows → dashboard format using colMap
+  // ── APPLY MAPPING ──
   const applyMapping = (rows, type, map) => {
     const schema = SCHEMA[type];
     return rows.map((row) => {
@@ -1585,30 +1718,39 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
       schema.required.forEach(field => {
         const srcCol = map[field];
         let val = srcCol ? (row[srcCol] ?? "") : "";
-        // Smart normalization per field
         if (field === "type") val = normalizeType(val || (map["department"] ? row[map["department"]] : ""));
         else if (field === "department") val = String(val||"").trim();
-        else if (field === "status") val = normalizeStatus(val);
-        else if (field === "expiry" || field === "filed" || field === "date" || field === "effectiveDate") val = normalizeDate(val);
+        else if (field === "status") {
+          const rawStatus = normalizeStatus(val);
+          if (!srcCol || !val.trim()) {
+            const expiryCol = map["expiry"];
+            const expNorm = normalizeDate(expiryCol ? row[expiryCol] : "");
+            if (expNorm) {
+              const days = Math.ceil((new Date(expNorm) - new Date()) / (1000*60*60*24));
+              val = days < 0 ? "Lapsed" : days <= 30 ? "Renewal Due" : "Active";
+            } else val = "Active";
+          } else val = rawStatus;
+        }
+        else if (["expiry","filed","date","effectiveDate"].includes(field)) val = normalizeDate(val);
         else if (field === "risk") val = normalizeRisk(val);
-        else if (field === "docLink" || field === "policyNo" || field === "contact") val = String(val||"").trim();
-        else if (field === "income") val = parseFloat(String(val||"0").replace(/[%,\s]/g,"")) || 0;
-        else if (field === "netPremium" || field === "gst" || field === "commisionable" || field === "premium" || field === "amount" || field === "totalPremium" || field === "commission") val = Number(String(val||"0").replace(/[₹,\s]/g,"")) || 0;
-        else if (field === "policiesSold" || field === "policies" || field === "target" || field === "claimsHandled") val = Number(val) || 0;
-        else if (field === "revenue" || field === "rating") val = parseFloat(val) || 0;
+        else if (["docLink","policyNo","contact"].includes(field)) val = String(val||"").trim();
+        else if (field === "income") val = parseFloat(String(val||"0").replace(/[%,\s₹]/g,"")) || 0;
+        else if (["netPremium","gst","commisionable","premium","amount","totalPremium","commission"].includes(field)) val = Number(String(val||"0").replace(/[₹,\s]/g,"")) || 0;
+        else if (["policiesSold","policies","target","claimsHandled"].includes(field)) val = Number(val) || 0;
+        else if (["revenue","rating"].includes(field)) val = parseFloat(val) || 0;
         item[field] = val;
       });
+      // Store ALL original columns too (so nothing is lost)
+      Object.keys(row).forEach(k => { if (!(k in item)) item["_"+k] = row[k]; });
       if (type==="agents" && map["claimsHandled"]) item.claimsHandled = Number(row[map["claimsHandled"]])||0;
-      // Auto-set year/month from date
       if (type==="policies") {
         if (!item.year && item.effectiveDate) item.year = item.effectiveDate.slice(0,4);
         if (!item.month && item.effectiveDate) item.month = new Date(item.effectiveDate).toLocaleString("default",{month:"short"});
-        // If type wasn't mapped but department was, auto-detect
-        if (!item.type || item.type === "Health") item.type = normalizeType(item.department || "");
+        if (!item.type || item.type==="Car") item.type = normalizeType(item.department||"");
       }
       return item;
     }).filter(item => {
-      const first = SCHEMA[type].required[0];
+      const first = schema.required.find(f => !["docLink","risk","type","status"].includes(f));
       return item[first] && String(item[first]).length > 0;
     });
   };
@@ -1722,43 +1864,30 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
     try {
       const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
       const res = await fetch(csvUrl);
-      if (!res.ok) throw new Error("Sheet public nahi hai ya URL galat hai.");
+      if (!res.ok) throw new Error("Sheet public nahi hai. File → Share → Anyone with link can view karo.");
       const text = await res.text();
       const rows = parseCSV(text);
       if (!rows.length) throw new Error("Sheet mein koi data nahi mila.");
       const headers = Object.keys(rows[0]);
+      // Use same comprehensive aliases as file upload
       const autoMap = {};
-      const FIELD_ALIASES2 = {
-        client:["name","client","customer","insured","policyholder","assured","member"],
-        type:["department","type","category","product","insurance type","policy type"],
-        premium:["total premium","totalpremium","premium","gross premium","net prm"],
-        status:["status","policy status","state"],
-        expiry:["expiry date","expiry","expiry dt","maturity","end date","renewal date"],
-        risk:["risk","risk level","grade"],
-        name:["name","client","customer","insured"],
-        email:["email","mail","e-mail"],
-        phone:["phone","contact","mobile","contact no"],
-        city:["city","location","place","district"],
-        amount:["amount","claim amount","loss amount"],
-        filed:["filed","date","claim date"],
-        agent:["agent","rm","executive"],
-        method:["method","mode","payment mode"],
-        date:["date","payment date","paid on"],
-      };
       Object.keys(SCHEMA[type].labels).forEach(field => {
-        const aliases = FIELD_ALIASES2[field] || [field];
+        const aliases = FIELD_ALIASES[field] || [field];
         const guess = headers.find(h => {
-          const hl = h.toLowerCase().replace(/[\s._-]/g,"");
-          return aliases.some(a => hl.includes(a.replace(/[\s._-]/g,"").slice(0,5)));
+          const hl = h.toLowerCase().replace(/[\s._\-\/]/g,"");
+          return aliases.some(a => {
+            const al = a.replace(/[\s._\-\/]/g,"");
+            return hl === al || hl.includes(al) || al.includes(hl);
+          });
         });
         if (guess) autoMap[field] = guess;
       });
       setColMap(autoMap);
       setRawParsed(rows);
       setPreview({ headers, rows: rows.slice(0,5), type });
-      setStatus({ type:"success", msg:`✅ ${rows.length} rows Google Sheet se aaye. Column mapping verify karo.` });
+      setStatus({ type:"success", msg:`✅ ${rows.length} rows Google Sheet se aaye. Column mapping verify karo phir Import karo.` });
     } catch(e) {
-      setStatus({ type:"error", msg:"Fetch failed: " + e.message + " — Sheet ko 'Anyone with link can view' karo aur publish karo." });
+      setStatus({ type:"error", msg:"Fetch failed: " + e.message });
     }
   };
 
@@ -2106,14 +2235,14 @@ export default function InsuranceDashboard() {
   }
 
   const pages = {
-    overview: <Overview t={t} polData={polData} clientData={clientData}/>,
+    overview: <Overview t={t} polData={polData} clientData={clientData} claimData={claimData} payData={payData}/>,
     policies: <PoliciesPage t={t} data={polData} setData={setPolData}/>,
     claims: <ClaimsPage t={t} data={claimData} setData={setClaimData}/>,
     clients: <ClientsPage t={t} data={clientData} setData={setClientData}/>,
     payments: <PaymentsPage t={t} data={payData} setData={setPayData}/>,
     agents: <AgentsPage t={t} data={agentData} setData={setAgentData}/>,
-    analytics: <AnalyticsPage t={t}/>,
-    regions: <RegionPage t={t}/>,
+    analytics: <AnalyticsPage t={t} polData={polData} payData={payData}/>,
+    regions: <RegionPage t={t} polData={polData}/>,
     calendar: <CalendarPage t={t}/>,
     calculator: <Calculator t={t}/>,
     import: <ImportPage t={t} setPolData={setPolData} setClientData={setClientData} setClaimData={setClaimData} setAgentData={setAgentData} setPayData={setPayData}/>,
