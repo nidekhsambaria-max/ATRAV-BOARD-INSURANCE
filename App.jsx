@@ -1,4 +1,44 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut } from "firebase/auth";
+import { getFirestore, doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
+
+// ── FIREBASE SETUP ─────────────────────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDqXHIpJwk8f9KzsjIasUyoyPcCJ8398N8",
+  authDomain: "atrav-insurance.firebaseapp.com",
+  projectId: "atrav-insurance",
+  storageBucket: "atrav-insurance.firebasestorage.app",
+  messagingSenderId: "120428421399",
+  appId: "1:120428421399:web:d2a5b90603bb0452421752"
+};
+
+let fbApp, fbAuth, fbDb, googleProvider;
+try {
+  fbApp = initializeApp(FIREBASE_CONFIG);
+  fbAuth = getAuth(fbApp);
+  fbDb = getFirestore(fbApp);
+  googleProvider = new GoogleAuthProvider();
+  enableIndexedDbPersistence(fbDb).catch(()=>{});
+} catch(e) { console.warn("Firebase init error:", e); }
+
+// Save data to Firestore under user's UID
+const saveToFirestore = async (uid, key, value) => {
+  if (!fbDb || !uid) return;
+  try {
+    await setDoc(doc(fbDb, "users", uid, "data", key), { value: JSON.stringify(value), updatedAt: Date.now() });
+  } catch(e) { console.warn("Firestore save error:", e); }
+};
+
+// Load data from Firestore
+const loadFromFirestore = async (uid, key) => {
+  if (!fbDb || !uid) return null;
+  try {
+    const snap = await getDoc(doc(fbDb, "users", uid, "data", key));
+    if (snap.exists()) return JSON.parse(snap.data().value);
+  } catch(e) { console.warn("Firestore load error:", e); }
+  return null;
+};
 
 // ── THEME ─────────────────────────────────────────────────────────────────────
 const getTheme = (dark) => ({
@@ -93,24 +133,40 @@ const statusColor = (s) => {
   return m[s] || "bg-slate-500/20 text-slate-400";
 };
 
-// ── PERSISTENT STORAGE HOOK (localStorage — works on GitHub Pages) ────────────
-const usePersistedState = (storageKey, initialValue) => {
+// ── PERSISTENT STORAGE HOOK (localStorage + Firestore) ───────────────────────
+const usePersistedState = (storageKey, initialValue, firebaseUid) => {
   const [state, setState] = useState(() => {
     try {
       const saved = localStorage.getItem(storageKey);
       return saved ? JSON.parse(saved) : initialValue;
-    } catch {
-      return initialValue;
-    }
+    } catch { return initialValue; }
   });
+  const [loaded, setLoaded] = useState(false);
 
+  // Load from Firestore on login
   useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(state));
-    } catch {}
-  }, [state, storageKey]);
+    if (!firebaseUid) { setLoaded(true); return; }
+    const key = storageKey.replace("atrav:", "");
+    loadFromFirestore(firebaseUid, key).then(data => {
+      if (data !== null) {
+        setState(data);
+        localStorage.setItem(storageKey, JSON.stringify(data));
+      }
+      setLoaded(true);
+    });
+  }, [firebaseUid, storageKey]);
 
-  return [state, setState, true]; // always "loaded" since localStorage is sync
+  // Save to localStorage + Firestore on change
+  useEffect(() => {
+    if (!loaded) return;
+    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
+    if (firebaseUid) {
+      const key = storageKey.replace("atrav:", "");
+      saveToFirestore(firebaseUid, key, state);
+    }
+  }, [state, loaded, storageKey, firebaseUid]);
+
+  return [state, setState, loaded];
 };
 
 
@@ -1402,6 +1458,7 @@ const LoginPage = ({ onLogin }) => {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [gLoading, setGLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!username.trim()||!password.trim()) { setError("Username aur password dono daalo."); return; }
@@ -1415,12 +1472,96 @@ const LoginPage = ({ onLogin }) => {
     }
     const user = users.find(u=>u.username.toLowerCase()===username.toLowerCase()&&u.hash===hashed);
     if (user) {
-      const session = { userId:user.id, username:user.username, name:user.name, role:user.role, loginAt:new Date().toISOString() };
+      const session = { userId:user.id, username:user.username, name:user.name, role:user.role, loginAt:new Date().toISOString(), provider:"local" };
       localStorage.setItem("atrav:session", JSON.stringify(session));
       onLogin(session);
     } else { setError("❌ Username ya password galat hai."); }
     setLoading(false);
   };
+
+  const handleGoogle = async () => {
+    if (!fbAuth||!googleProvider) { setError("Firebase setup nahi hua."); return; }
+    setGLoading(true); setError("");
+    try {
+      const result = await signInWithPopup(fbAuth, googleProvider);
+      const u = result.user;
+      const session = { userId:u.uid, uid:u.uid, username:u.email, name:u.displayName||u.email, role:"admin", loginAt:new Date().toISOString(), provider:"google", photoURL:u.photoURL, email:u.email };
+      localStorage.setItem("atrav:session", JSON.stringify(session));
+      onLogin(session);
+    } catch(e) {
+      if (e.code==="auth/popup-closed-by-user") setError("Login cancel ho gaya.");
+      else if (e.code==="auth/unauthorized-domain") setError("⚠️ Firebase Console → Authentication → Settings → Authorized domains mein GitHub Pages domain add karo: nidekhsambaria-max.github.io");
+      else setError("Google login failed: " + (e.message||e.code));
+    }
+    setGLoading(false);
+  };
+
+  return (
+    <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#080d16", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:16, position:"relative", overflow:"hidden" }}>
+      <div style={{ position:"absolute", width:500, height:500, borderRadius:"50%", background:"rgba(245,158,11,0.06)", filter:"blur(80px)", top:"10%", left:"20%", pointerEvents:"none" }}/>
+      <div style={{ position:"absolute", width:400, height:400, borderRadius:"50%", background:"rgba(96,165,250,0.05)", filter:"blur(80px)", bottom:"10%", right:"15%", pointerEvents:"none" }}/>
+      <div style={{ width:"100%", maxWidth:420, position:"relative" }}>
+        <div style={{ textAlign:"center", marginBottom:32 }}>
+          <div style={{ width:64, height:64, borderRadius:18, background:"linear-gradient(135deg,#f59e0b,#ea580c)", display:"inline-flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:28, color:"#000", marginBottom:14, boxShadow:"0 8px 32px rgba(245,158,11,0.35)" }}>A</div>
+          <h1 style={{ color:"#fff", fontWeight:800, fontSize:26, margin:0 }}>ATRAV Insurance Suite</h1>
+          <p style={{ color:"#64748b", fontSize:13, marginTop:4 }}>Secure Login · Data Cloud Mein Save</p>
+        </div>
+        <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:22, padding:28 }}>
+
+          {/* ── GOOGLE BUTTON ── */}
+          <button onClick={handleGoogle} disabled={gLoading}
+            style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:10, background:"#fff", border:"none", borderRadius:12, padding:"13px", fontSize:14, fontWeight:700, color:"#1e293b", cursor:gLoading?"not-allowed":"pointer", marginBottom:22, opacity:gLoading?0.7:1, boxShadow:"0 2px 16px rgba(0,0,0,0.4)", transition:"opacity 0.2s" }}>
+            {gLoading
+              ? <div style={{ width:18, height:18, border:"2px solid #ddd", borderTop:"2px solid #4285f4", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>
+              : <svg width="18" height="18" viewBox="0 0 48 48">
+                  <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/>
+                  <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/>
+                  <path fill="#FBBC05" d="M11.68 28.18A13.9 13.9 0 0 1 10.9 24c0-1.45.25-2.86.78-4.18v-5.7H4.34A23.93 23.93 0 0 0 0 24c0 3.86.92 7.51 2.56 10.74l7.12-5.56z"/>
+                  <path fill="#EA4335" d="M24 9.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 3.09 29.93 1 24 1 15.4 1 7.96 5.93 4.34 13.26l7.34 5.56C13.42 13.62 18.27 9.75 24 9.75z"/>
+                </svg>
+            }
+            {gLoading ? "Google se login ho raha hai..." : "Google se Sign In karo"}
+          </button>
+
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:20 }}>
+            <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.08)" }}/>
+            <span style={{ color:"#475569", fontSize:12, fontWeight:600 }}>ya</span>
+            <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.08)" }}/>
+          </div>
+
+          {/* ── USERNAME/PASSWORD ── */}
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#94a3b8", marginBottom:6, textTransform:"uppercase" }}>Username</label>
+              <input value={username} onChange={e=>{setUsername(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="admin"
+                style={{ width:"100%", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"11px 14px", fontSize:13, color:"#e2e8f0", outline:"none", boxSizing:"border-box" }}/>
+            </div>
+            <div>
+              <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#94a3b8", marginBottom:6, textTransform:"uppercase" }}>Password</label>
+              <div style={{ position:"relative" }}>
+                <input type={showPass?"text":"password"} value={password} onChange={e=>{setPassword(e.target.value);setError("");}} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="••••••••"
+                  style={{ width:"100%", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"11px 42px 11px 14px", fontSize:13, color:"#e2e8f0", outline:"none", boxSizing:"border-box" }}/>
+                <button onClick={()=>setShowPass(p=>!p)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#94a3b8", cursor:"pointer", fontSize:16 }}>{showPass?"🙈":"👁️"}</button>
+              </div>
+            </div>
+            {error && <div style={{ background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:10, padding:"10px 14px", fontSize:12, color:"#f87171" }}>{error}</div>}
+            <button onClick={handleLogin} disabled={loading}
+              style={{ background:"linear-gradient(135deg,#f59e0b,#ea580c)", border:"none", borderRadius:12, padding:"12px", fontSize:14, fontWeight:800, color:"#000", cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1 }}>
+              {loading?"🔄 Login ho raha hai...":"🔐 Login"}
+            </button>
+          </div>
+
+          <div style={{ marginTop:20, padding:"12px 14px", background:"rgba(245,158,11,0.08)", border:"1px solid rgba(245,158,11,0.2)", borderRadius:12 }}>
+            <p style={{ fontSize:11, color:"#f59e0b", fontWeight:700, marginBottom:4 }}>🔑 Default Admin:</p>
+            <p style={{ fontSize:12, color:"#94a3b8" }}>Username: <b style={{ color:"#e2e8f0" }}>admin</b> · Password: <b style={{ color:"#e2e8f0" }}>admin123</b></p>
+          </div>
+        </div>
+        <p style={{ textAlign:"center", color:"#334155", fontSize:11, marginTop:16 }}>ATRAV Insurance Suite · Data Firestore mein save hoga</p>
+      </div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+};
 
   return (
     <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#080d16", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
@@ -2165,19 +2306,25 @@ export default function InsuranceDashboard() {
     try { return JSON.parse(localStorage.getItem("atrav:session") || "null"); } catch { return null; }
   });
   const handleLogin = (sess) => setSession(sess);
-  const handleLogout = () => { localStorage.removeItem("atrav:session"); setSession(null); };
+  const handleLogout = async () => {
+    try { if (fbAuth && session?.provider==="google") await fbSignOut(fbAuth); } catch {}
+    localStorage.removeItem("atrav:session");
+    setSession(null);
+  };
   const isAdmin = session?.role === "admin";
   const isViewer = session?.role === "viewer";
+  const firebaseUid = session?.uid || null; // Google users have uid
 
   // Show login if not authenticated
   if (!session) return <LoginPage onLogin={handleLogin}/>;
-  // ── PERSISTENT DATA ──
-  const [notifications, setNotificationsRaw, notifLoaded] = usePersistedState("atrav:notifications", NOTIFICATIONS_INIT);
-  const [polData, setPolDataRaw, polLoaded]       = usePersistedState("atrav:policies",      INIT_POLICIES);
-  const [clientData, setClientDataRaw, clientLoaded] = usePersistedState("atrav:clients",    INIT_CLIENTS);
-  const [claimData, setClaimDataRaw, claimLoaded] = usePersistedState("atrav:claims",        INIT_CLAIMS);
-  const [agentData, setAgentDataRaw, agentLoaded] = usePersistedState("atrav:agents",        INIT_AGENTS);
-  const [payData, setPayDataRaw, payLoaded]       = usePersistedState("atrav:payments",      INIT_PAYMENTS);
+
+  // ── PERSISTENT DATA (synced to Firestore for Google users) ──
+  const [notifications, setNotificationsRaw, notifLoaded] = usePersistedState("atrav:notifications", NOTIFICATIONS_INIT, firebaseUid);
+  const [polData, setPolDataRaw, polLoaded]       = usePersistedState("atrav:policies",      INIT_POLICIES,   firebaseUid);
+  const [clientData, setClientDataRaw, clientLoaded] = usePersistedState("atrav:clients",    INIT_CLIENTS,    firebaseUid);
+  const [claimData, setClaimDataRaw, claimLoaded] = usePersistedState("atrav:claims",        INIT_CLAIMS,     firebaseUid);
+  const [agentData, setAgentDataRaw, agentLoaded] = usePersistedState("atrav:agents",        INIT_AGENTS,     firebaseUid);
+  const [payData, setPayDataRaw, payLoaded]       = usePersistedState("atrav:payments",      INIT_PAYMENTS,   firebaseUid);
 
   const allLoaded = notifLoaded && polLoaded && clientLoaded && claimLoaded && agentLoaded && payLoaded;
 
@@ -2273,17 +2420,23 @@ export default function InsuranceDashboard() {
         </nav>
         <div style={{ borderTop:`1px solid ${t.sidebarBorder}`, padding:"12px 14px", whiteSpace:"nowrap" }}>
           <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-            <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#f59e0b,#ea580c)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:"#000", flexShrink:0 }}>{session.name[0].toUpperCase()}</div>
-            <div style={{ minWidth:0 }}>
-              <p style={{ fontSize:12, fontWeight:700, color:t.text, overflow:"hidden", textOverflow:"ellipsis" }}>{session.name}</p>
-              <p style={{ fontSize:10, color:t.textMuted }}>{session.role} · @{session.username}</p>
+            {session.photoURL
+              ? <img src={session.photoURL} referrerPolicy="no-referrer" style={{ width:32, height:32, borderRadius:"50%", flexShrink:0, objectFit:"cover" }} alt="avatar"/>
+              : <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#f59e0b,#ea580c)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:"#000", flexShrink:0 }}>{(session.name||"A")[0].toUpperCase()}</div>
+            }
+            <div style={{ minWidth:0, overflow:"hidden" }}>
+              <p style={{ fontSize:12, fontWeight:700, color:t.text, overflow:"hidden", textOverflow:"ellipsis" }}>{session.name||"Admin"}</p>
+              <p style={{ fontSize:10, color:t.textMuted }}>{session.role} · {session.provider==="google"?"🌐 Google":"🔐 Local"}</p>
             </div>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 8px", borderRadius:8, background:"rgba(52,211,153,0.08)", border:"1px solid rgba(52,211,153,0.2)", marginBottom:6 }}>
-            <div style={{ width:6, height:6, borderRadius:99, background:"#34d399", flexShrink:0 }}/>
-            <span style={{ fontSize:10, color:"#34d399", fontWeight:600 }}>Data auto-saved ✓</span>
+          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 8px", borderRadius:8, background: session.provider==="google"?"rgba(96,165,250,0.08)":"rgba(52,211,153,0.08)", border:`1px solid ${session.provider==="google"?"rgba(96,165,250,0.2)":"rgba(52,211,153,0.2)"}`, marginBottom:6 }}>
+            <div style={{ width:6, height:6, borderRadius:99, background: session.provider==="google"?"#60a5fa":"#34d399", animation: session.provider==="google"?"pulse 2s infinite":"none", flexShrink:0 }}/>
+            <span style={{ fontSize:10, color: session.provider==="google"?"#60a5fa":"#34d399", fontWeight:600 }}>
+              {session.provider==="google" ? "☁️ Cloud Sync Active" : "💾 Local Saved ✓"}
+            </span>
           </div>
-          {isAdmin&&<button onClick={()=>setShowResetConfirm(true)} style={{ width:"100%", marginBottom:6, background:"rgba(248,113,113,0.08)", border:"1px solid rgba(248,113,113,0.2)", borderRadius:8, padding:"5px 10px", fontSize:11, color:"#f87171", cursor:"pointer", fontWeight:600 }}>🔄 Reset to Default Data</button>}
+          {saveStatus&&<div style={{ fontSize:10, color:saveStatus==="saving"?"#f59e0b":"#34d399", marginBottom:6, textAlign:"center", fontWeight:600 }}>{saveStatus==="saving"?"💾 Saving...":"✅ Saved!"}</div>}
+          {isAdmin&&<button onClick={()=>setShowResetConfirm(true)} style={{ width:"100%", marginBottom:6, background:"rgba(248,113,113,0.08)", border:"1px solid rgba(248,113,113,0.2)", borderRadius:8, padding:"5px 10px", fontSize:11, color:"#f87171", cursor:"pointer", fontWeight:600 }}>🔄 Reset Data</button>}
           <button onClick={handleLogout} style={{ width:"100%", background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.25)", borderRadius:8, padding:"7px 10px", fontSize:12, color:"#f87171", cursor:"pointer", fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>🚪 Logout</button>
         </div>
       </aside>
