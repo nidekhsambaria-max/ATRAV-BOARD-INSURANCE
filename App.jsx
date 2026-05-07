@@ -1513,12 +1513,7 @@ const LoginPage = ({ onLogin }) => {
             style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:10, background:"#fff", border:"none", borderRadius:12, padding:"13px", fontSize:14, fontWeight:700, color:"#1e293b", cursor:gLoading?"not-allowed":"pointer", marginBottom:22, opacity:gLoading?0.7:1, boxShadow:"0 2px 16px rgba(0,0,0,0.4)", transition:"opacity 0.2s" }}>
             {gLoading
               ? <div style={{ width:18, height:18, border:"2px solid #ddd", borderTop:"2px solid #4285f4", borderRadius:"50%", animation:"spin 0.8s linear infinite" }}/>
-              : <svg width="18" height="18" viewBox="0 0 48 48">
-                  <path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/>
-                  <path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.32-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/>
-                  <path fill="#FBBC05" d="M11.68 28.18A13.9 13.9 0 0 1 10.9 24c0-1.45.25-2.86.78-4.18v-5.7H4.34A23.93 23.93 0 0 0 0 24c0 3.86.92 7.51 2.56 10.74l7.12-5.56z"/>
-                  <path fill="#EA4335" d="M24 9.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 3.09 29.93 1 24 1 15.4 1 7.96 5.93 4.34 13.26l7.34 5.56C13.42 13.62 18.27 9.75 24 9.75z"/>
-                </svg>
+              : <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" height="18" alt="G"/>
             }
             {gLoading ? "Google se login ho raha hai..." : "Google se Sign In karo"}
           </button>
@@ -1562,46 +1557,6 @@ const LoginPage = ({ onLogin }) => {
     </div>
   );
 };
-
-  return (
-    <div style={{ fontFamily:"'DM Sans','Segoe UI',sans-serif", background:"#080d16", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-      <div style={{ width:"100%", maxWidth:420 }}>
-        <div style={{ textAlign:"center", marginBottom:36 }}>
-          <div style={{ width:64, height:64, borderRadius:18, background:"linear-gradient(135deg,#f59e0b,#ea580c)", display:"inline-flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:28, color:"#000", marginBottom:16 }}>A</div>
-          <h1 style={{ color:"#e2e8f0", fontWeight:800, fontSize:26, letterSpacing:"-0.5px" }}>ATRAV Insurance Suite</h1>
-          <p style={{ color:"#94a3b8", fontSize:13, marginTop:6 }}>Apne account mein login karein</p>
-        </div>
-        <div style={{ background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:22, padding:32 }}>
-          <div style={{ marginBottom:16 }}>
-            <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#94a3b8", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.06em" }}>Username</label>
-            <input value={username} onChange={e=>setUsername(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="Apna username daalo"
-              style={{ width:"100%", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"12px 14px", fontSize:14, color:"#e2e8f0", outline:"none", boxSizing:"border-box" }}/>
-          </div>
-          <div style={{ marginBottom:20 }}>
-            <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#94a3b8", marginBottom:6, textTransform:"uppercase", letterSpacing:"0.06em" }}>Password</label>
-            <div style={{ position:"relative" }}>
-              <input value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} type={showPass?"text":"password"} placeholder="••••••••"
-                style={{ width:"100%", background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:12, padding:"12px 44px 12px 14px", fontSize:14, color:"#e2e8f0", outline:"none", boxSizing:"border-box" }}/>
-              <button onClick={()=>setShowPass(p=>!p)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#94a3b8", cursor:"pointer", fontSize:18 }}>{showPass?"🙈":"👁️"}</button>
-            </div>
-          </div>
-          {error && <div style={{ background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)", borderRadius:10, padding:"10px 14px", fontSize:13, color:"#f87171", marginBottom:16 }}>{error}</div>}
-          <button onClick={handleLogin} disabled={loading}
-            style={{ width:"100%", background:"linear-gradient(135deg,#f59e0b,#ea580c)", border:"none", borderRadius:12, padding:"14px", fontSize:15, fontWeight:800, color:"#000", cursor:loading?"not-allowed":"pointer", opacity:loading?0.7:1, transition:"opacity 0.2s" }}>
-            {loading?"🔄 Logging in...":"🔐 Login"}
-          </button>
-          <div style={{ marginTop:20, padding:14, background:"rgba(255,255,255,0.03)", borderRadius:12, border:"1px solid rgba(255,255,255,0.06)" }}>
-            <p style={{ fontSize:11, color:"#64748b", fontWeight:700, marginBottom:6, textTransform:"uppercase", letterSpacing:"0.05em" }}>Default Credentials (Pehli Baar)</p>
-            <p style={{ fontSize:13, color:"#94a3b8" }}>Username: <b style={{ color:"#f59e0b" }}>admin</b> &nbsp; Password: <b style={{ color:"#f59e0b" }}>admin123</b></p>
-            <p style={{ fontSize:11, color:"#64748b", marginTop:8 }}>⚠️ Login ke baad User Settings mein password zaroor change karein!</p>
-          </div>
-        </div>
-        <p style={{ textAlign:"center", color:"#334155", fontSize:11, marginTop:16 }}>© 2026 ATRAV Insurance Suite · Secured with SHA-256</p>
-      </div>
-    </div>
-  );
-};
-
 // ── USER MANAGEMENT PAGE ──────────────────────────────────────────────────────
 const UserManagement = ({ t, currentUser }) => {
   const [users, setUsers] = useState(()=>JSON.parse(localStorage.getItem("atrav:users")||"[]"));
@@ -1772,11 +1727,11 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
     }).filter(row => Object.values(row).some(v => v !== ""));
   };
 
-  // ── DATE NORMALIZER — handles ALL Indian date formats ──
+  // ── DATE NORMALIZER — always returns yyyy-mm-dd for storage ──
   const normalizeDate = (val) => {
     if (!val) return "";
     let s = String(val).trim().replace(/\s+/g," ");
-    if (!s || s === "0" || s.toLowerCase() === "n/a") return "";
+    if (!s || s === "0" || s.toLowerCase() === "n/a" || s === "-") return "";
 
     // Already YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
@@ -1786,27 +1741,33 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
       const [d,m,y] = s.split("/");
       return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
     }
-    // dd-mm-yyyy
-    if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
-      const [d,m,y] = s.split("-");
-      return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
-    }
-    // dd.mm.yyyy
+    // dd.mm.yyyy (Indian dot format)
     if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(s)) {
       const [d,m,y] = s.split(".");
       return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
     }
-    // d/m/yy → assume 20xx
-    if (/^\d{1,2}\/\d{1,2}\/\d{2}$/.test(s)) {
-      const [d,m,y] = s.split("/");
-      return `20${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+    // dd-mm-yyyy
+    if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
+      const parts = s.split("-");
+      if (parts[0].length <= 2) {
+        const [d,m,y] = parts;
+        return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+      }
     }
-    // Excel serial number (days since 1900-01-01)
+    // mm/dd/yyyy (US format) — detect if month > 12 swap
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+      const [a,b,y] = s.split("/");
+      if (Number(a) > 12) return `${y}-${b.padStart(2,"0")}-${a.padStart(2,"0")}`;
+      return `${y}-${a.padStart(2,"0")}-${b.padStart(2,"0")}`;
+    }
+    // Excel serial date number
     if (/^\d{5}$/.test(s)) {
-      const d = new Date(Date.UTC(1900,0,1) + (parseInt(s)-2)*86400000);
-      return d.toISOString().slice(0,10);
+      try {
+        const d = new Date((Number(s) - 25569) * 86400 * 1000);
+        return d.toISOString().slice(0,10);
+      } catch {}
     }
-    // Try JS Date parse as last resort
+    // Try JS Date parse as fallback
     try {
       const dt = new Date(s);
       if (!isNaN(dt.getTime())) return dt.toISOString().slice(0,10);
@@ -1817,15 +1778,12 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
   // ── FORMAT DATE for display as dd/mm/yyyy ──
   const fmtDate = (val) => {
     if (!val) return "—";
-    const s = String(val).trim();
-    // Convert YYYY-MM-DD to dd/mm/yyyy
+    const s = normalizeDate(String(val).trim());
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       const [y,m,d] = s.split("-");
       return `${d}/${m}/${y}`;
     }
-    // If already dd/mm/yyyy
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) return s;
-    return s;
+    return val||"—";
   };
 
   // ── INSURANCE TYPE NORMALIZER ──
@@ -1896,11 +1854,62 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
     });
   };
 
+  // ── FIELD ALIASES (shared by handleFile AND fetchGSheet) ──
+  const FIELD_ALIASES = {
+    policyNo:     ["policy no","policy no.","policy number","policyno","pol no","policy_no","policy id"],
+    client:       ["name","client","customer","insured","policyholder","policy holder","assured","member"],
+    contact:      ["contact no","contact no.","contact","phone","mobile","mob no","contact number","phone no"],
+    department:   ["department","dept","product","cover","product type"],
+    type:         ["insurance type","ins type"],
+    effectiveDate:["effective date","effective dt","effective","start date","issue date","policy date","from date","inception date","commencement"],
+    netPremium:   ["net prm","net prm.","net premium","net prem","basic premium","basic prm","od premium"],
+    gst:          ["gst","tax","service tax","igst","cgst"],
+    premium:      ["total premium","totalpremium","gross premium","total prm","total prm.","grand total"],
+    commisionable:["od/net prm. commisionable","commisionable","commissionable","od/net prm","od net prm"],
+    income:       ["income%","income %","income","commission %","comm %","brokerage %","rate%","rate"],
+    status:       ["status","policy status","state"],
+    expiry:       ["expiry date","expiry","expiry dt","maturity","end date","policy end","renewal date","due date","valid till"],
+    risk:         ["risk","risk level","grade"],
+    docLink:      ["policy link","policy_link","document link","doc link","link","url","policy url","soft copy","pdf link","download link","policy copy","policy document","doc","document","policy doc","file link","attachment"],
+    name:         ["name","client","customer","insured","client name"],
+    email:        ["email","mail","e-mail","email id"],
+    phone:        ["phone","mobile","mob","phone no"],
+    city:         ["city","location","place","district","state","area"],
+    policies:     ["policies","no of policies","policy count","no. of policies"],
+    totalPremium: ["total premium","totalpremium","gross premium"],
+    since:        ["since","joining year","member since","year"],
+    amount:       ["amount","claim amount","loss amount","settled amount","claim amt"],
+    filed:        ["filed","claim date","filed date","reported date","date of loss"],
+    agent:        ["agent","rm","relationship manager","executive","sales person","advisor"],
+    revenue:      ["revenue","business","premium (l)","revenue (l)"],
+    rating:       ["rating","score","stars"],
+    target:       ["target","goal","monthly target"],
+    commission:   ["commission","brokerage","earning","incentive"],
+    date:         ["date","payment date","paid on","transaction date","receipt date"],
+    method:       ["method","mode","payment mode","pay mode","channel","payment method"],
+  };
+
+  const autoDetectColumns = (headers, schemaType) => {
+    const autoMap = {};
+    Object.keys(SCHEMA[schemaType].labels).forEach(field => {
+      const aliases = FIELD_ALIASES[field] || [field];
+      const guess = headers.find(h => {
+        const hl = h.toLowerCase().replace(/[\s._\-\/]/g,"");
+        return aliases.some(a => {
+          const al = a.replace(/[\s._\-\/]/g,"");
+          return hl === al || hl.includes(al) || al.includes(hl);
+        });
+      });
+      if (guess) autoMap[field] = guess;
+    });
+    return autoMap;
+  };
+
   // ── EXCEL / CSV UPLOAD ──
   const handleFile = async (file) => {
     if (!file) return;
     setStatus({ type:"loading", msg:"File parse ho raha hai..." });
-    setPreview(null); setColMap({});
+    setPreview(null); setColMap({}); setRawParsed(null);
     try {
       const ext = file.name.split(".").pop().toLowerCase();
       let rows = [];
@@ -1908,72 +1917,33 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
         const text = await file.text();
         rows = parseCSV(text);
       } else {
-        // Excel via SheetJS
+        // Excel via SheetJS — try CDN with fallback
         const buf = await file.arrayBuffer();
-        const XLSX = await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");
+        let XLSX;
+        try {
+          XLSX = await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");
+        } catch {
+          try {
+            XLSX = await import("https://unpkg.com/xlsx@0.18.5/xlsx.mjs");
+          } catch {
+            setStatus({ type:"error", msg:"❌ Excel library load nahi hui. File ko pehle CSV mein convert karo aur phir upload karo." });
+            return;
+          }
+        }
         const wb = XLSX.read(buf, { type:"array", cellDates:true });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(ws, { defval:"", raw:false });
-        rows = json;
+        rows = XLSX.utils.sheet_to_json(ws, { defval:"", raw:false });
       }
-      if (!rows.length) { setStatus({ type:"error", msg:"File empty hai ya format sahi nahi." }); return; }
+      if (!rows.length) { setStatus({ type:"error", msg:"❌ File empty hai ya format galat hai." }); return; }
       const headers = Object.keys(rows[0]);
-      // Auto-guess column mapping
-      // Smart auto-guess column mapping
-      const autoMap = {};
-      const SCHEMA_TYPE = gsType;
-      const FIELD_ALIASES = {
-        policyNo:     ["policy no","policy no.","policy number","policyno","pol no","policy_no","policy id"],
-        client:       ["name","client","customer","insured","policyholder","policy holder","assured","member"],
-        contact:      ["contact no","contact no.","contact","phone","mobile","mob no","contact number","phone no"],
-        department:   ["department","dept","product","cover","product type"],
-        type:         ["insurance type","ins type"],
-        effectiveDate:["effective date","effective dt","effective","start date","issue date","policy date","from date","inception date","commencement"],
-        netPremium:   ["net prm","net prm.","net premium","net prem","basic premium","basic prm"],
-        gst:          ["gst","tax","service tax","igst","cgst"],
-        premium:      ["total premium","totalpremium","gross premium","total prm","total prm."],
-        commisionable:["od/net prm. commisionable","commisionable","commissionable","od/net prm","od net prm"],
-        income:       ["income%","income %","income","commission %","comm %","brokerage %","rate%"],
-        status:       ["status","policy status","state"],
-        expiry:       ["expiry date","expiry","expiry dt","maturity","end date","policy end","renewal date","due date"],
-        risk:         ["risk","risk level","grade"],
-        docLink:      ["policy link","policy_link","policylink","document link","doc link","link","url","policy url",
-                       "soft copy","pdf link","download link","policy copy","policy document","doc","document",
-                       "policy doc","file link","hyperlink","google drive","drive link","file","attachment","policy file"],
-        name:         ["name","client","customer","insured"],
-        email:        ["email","mail","e-mail","email id"],
-        phone:        ["phone","mobile","mob"],
-        city:         ["city","location","place","district"],
-        policies:     ["policies","no of policies","policy count"],
-        totalPremium: ["total premium","totalpremium","gross premium"],
-        since:        ["since","joining year","member since"],
-        amount:       ["amount","claim amount","loss amount","settled amount"],
-        filed:        ["filed","claim date","filed date","reported date"],
-        agent:        ["agent","rm","relationship manager","executive","sales person"],
-        revenue:      ["revenue","business","premium (l)"],
-        rating:       ["rating","score","stars"],
-        target:       ["target","goal","monthly target"],
-        commission:   ["commission","brokerage","earning","incentive"],
-        date:         ["payment date","paid on","transaction date"],
-        method:       ["method","mode","payment mode","pay mode","channel"],
-      };
-      Object.keys(SCHEMA[SCHEMA_TYPE].labels).forEach(field => {
-        const aliases = FIELD_ALIASES[field] || [field];
-        const guess = headers.find(h => {
-          const hl = h.toLowerCase().replace(/[\s._\-\/]/g,"");
-          return aliases.some(a => {
-            const al = a.replace(/[\s._\-\/]/g,"");
-            return hl === al || hl.includes(al) || al.includes(hl);
-          });
-        });
-        if (guess) autoMap[field] = guess;
-      });
+      const autoMap = autoDetectColumns(headers, gsType);
       setColMap(autoMap);
       setRawParsed(rows);
-      setPreview({ headers, rows: rows.slice(0,5), type: SCHEMA_TYPE });
-      setStatus({ type:"success", msg:`✅ ${rows.length} rows milein. Column mapping check karo, phir "Import" karo.` });
+      setPreview({ headers, rows: rows.slice(0,5), type: gsType });
+      const matched = Object.keys(autoMap).length;
+      setStatus({ type:"success", msg:`✅ ${rows.length} rows mili! ${matched} columns auto-detect hue. Mapping verify karo phir Import karo.` });
     } catch(e) {
-      setStatus({ type:"error", msg:"File parse nahi ho saka: " + e.message });
+      setStatus({ type:"error", msg:"❌ File parse nahi ho saka: " + e.message });
     }
   };
 
@@ -1999,36 +1969,27 @@ const ImportPage = ({ t, setPolData, setClientData, setClaimData, setAgentData, 
 
   const fetchGSheet = async (url, type) => {
     const id = extractSheetId(url);
-    if (!id) { setStatus({ type:"error", msg:"Invalid Google Sheet URL. Sahi URL paste karo." }); return; }
+    if (!id) { setStatus({ type:"error", msg:"❌ Invalid Google Sheet URL. Sahi URL paste karo." }); return; }
     const gid = extractGid(url);
-    setStatus({ type:"loading", msg:"Google Sheet fetch ho raha hai..." });
+    setStatus({ type:"loading", msg:"🔄 Google Sheet fetch ho raha hai..." });
     try {
+      // Try direct CSV export first
       const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}`;
-      const res = await fetch(csvUrl);
-      if (!res.ok) throw new Error("Sheet public nahi hai. File → Share → Anyone with link can view karo.");
+      const res = await fetch(csvUrl, { cache:"no-store" });
+      if (!res.ok) throw new Error("Sheet public nahi hai. File → Share → 'Anyone with link can view' karo.");
       const text = await res.text();
+      if (!text.trim()) throw new Error("Sheet empty aa rahi hai.");
       const rows = parseCSV(text);
-      if (!rows.length) throw new Error("Sheet mein koi data nahi mila.");
+      if (!rows.length) throw new Error("Data parse nahi hua — sheet mein headers hone chahiye.");
       const headers = Object.keys(rows[0]);
-      // Use same comprehensive aliases as file upload
-      const autoMap = {};
-      Object.keys(SCHEMA[type].labels).forEach(field => {
-        const aliases = FIELD_ALIASES[field] || [field];
-        const guess = headers.find(h => {
-          const hl = h.toLowerCase().replace(/[\s._\-\/]/g,"");
-          return aliases.some(a => {
-            const al = a.replace(/[\s._\-\/]/g,"");
-            return hl === al || hl.includes(al) || al.includes(hl);
-          });
-        });
-        if (guess) autoMap[field] = guess;
-      });
+      const autoMap = autoDetectColumns(headers, type);
       setColMap(autoMap);
       setRawParsed(rows);
       setPreview({ headers, rows: rows.slice(0,5), type });
-      setStatus({ type:"success", msg:`✅ ${rows.length} rows Google Sheet se aaye. Column mapping verify karo phir Import karo.` });
+      const matched = Object.keys(autoMap).length;
+      setStatus({ type:"success", msg:`✅ ${rows.length} rows Google Sheet se aayi! ${matched} columns auto-detect hue. Mapping verify karo phir Import karo.` });
     } catch(e) {
-      setStatus({ type:"error", msg:"Fetch failed: " + e.message });
+      setStatus({ type:"error", msg:"❌ " + e.message });
     }
   };
 
