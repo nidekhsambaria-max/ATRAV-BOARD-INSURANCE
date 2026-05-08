@@ -13,6 +13,7 @@ const FIREBASE_CONFIG = {
   appId: "1:120428421399:web:d2a5b90603bb0452421752"
 };
 
+
 let fbApp, fbAuth, fbDb, googleProvider;
 try {
   fbApp = initializeApp(FIREBASE_CONFIG);
