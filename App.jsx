@@ -10,7 +10,7 @@ import {
 
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 const FB = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  apiKey:  "AIzaSyClC3Sr9PPauLP82DtaPoYA0upxvbgLRWU"          import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
@@ -125,11 +125,9 @@ const parseCSV = (txt) => {
   }).filter(r=>Object.values(r).some(v=>v));
 };
 
-// ── SIMPLE HASH (no async needed) ────────────────────────────────────────────
-const hashPw = (pw) => {
-  let h = 5381;
-  for (let i = 0; i < pw.length; i++) h = (h * 33) ^ pw.charCodeAt(i);
-  return "h" + Math.abs(h >>> 0).toString(16) + pw.length;
+const hashPw = async (pw) => {
+  const buf = await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
 };
 
 const exportCSV = (rows,name) => {
@@ -267,31 +265,20 @@ const LoginPage=({onLogin})=>{
   const [loading,setLoading]=useState(false);
   const [gLoad,setGLoad]=useState(false);
 
-  const doLogin=()=>{
+  const doLogin=async()=>{
     if(!user||!pass){setErr("Dono fields fill karo.");return;}
     setLoading(true);setErr("");
-    const hash=hashPw(pass);
+    const hash=await hashPw(pass);
     let users=ls.get("atrav:users",[]);
-    if(!users.length){
-      const dh=hashPw("admin123");
-      users=[{id:"u1",username:"admin",name:"Admin",hash:dh}];
-      ls.set("atrav:users",users);
-    }
+    if(!users.length){const dh=await hashPw("admin123");users=[{id:"u1",username:"admin",name:"Admin",hash:dh}];ls.set("atrav:users",users);}
     const found=users.find(u=>u.username===user.toLowerCase()&&u.hash===hash);
-    if(found){
-      const s={id:found.id,name:found.name,username:found.username,provider:"local",at:Date.now()};
-      ls.set("atrav:session",s);onLogin(s);
-    } else {
-      setErr("❌ Galat username ya password.");
-    }
+    if(found){const s={id:found.id,name:found.name,username:found.username,provider:"local",at:Date.now()};ls.set("atrav:session",s);onLogin(s);}
+    else setErr("❌ Galat username ya password.");
     setLoading(false);
   };
 
   const doGoogle=async()=>{
-    if(!fbAuth||!gProvider){
-      setErr("⚠️ Google login setup incomplete. GitHub Secrets check karo aur rebuild karo. Abhi Admin login use karein: admin / admin123");
-      return;
-    }
+    if(!fbAuth||!gProvider){setErr("Firebase setup check karo.");return;}
     setGLoad(true);setErr("");
     try{
       const r=await signInWithPopup(fbAuth,gProvider);
@@ -299,10 +286,7 @@ const LoginPage=({onLogin})=>{
       const s={id:u.uid,uid:u.uid,name:u.displayName||u.email,username:u.email,photo:u.photoURL,email:u.email,provider:"google",at:Date.now()};
       ls.set("atrav:session",s);onLogin(s);
     }catch(e){
-      if(e.code==="auth/popup-closed-by-user") setErr("Login cancel ho gaya.");
-      else if(e.code==="auth/unauthorized-domain") setErr("⚠️ Firebase Console → Authentication → Settings → Authorized domains mein 'nidekhsambaria-max.github.io' add karo.");
-      else if(e.code==="auth/configuration-not-found") setErr("⚠️ Firebase Authentication enable nahi hai. Firebase Console → Authentication → Enable karo.");
-      else setErr("Google login error: " + (e.code||e.message));
+      setErr(e.code==="auth/popup-closed-by-user"?"Login cancel ho gaya.":e.code==="auth/unauthorized-domain"?"⚠️ Firebase Console → Auth → Authorized domains mein apna domain add karo.":"Google login failed: "+e.message);
     }
     setGLoad(false);
   };
