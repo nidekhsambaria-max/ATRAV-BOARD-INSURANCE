@@ -10,7 +10,7 @@ import {
 
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 const FB = {
-  apiKey:  "AIzaSyClC3Sr9PPauLP82DtaPoYA0upxvbgLRWU"          import.meta.env.VITE_FIREBASE_API_KEY,
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
@@ -26,7 +26,7 @@ try {
 } catch(e) { console.warn("Firebase init:", e); }
 
 // ── FIRESTORE HELPERS ─────────────────────────────────────────────────────────
-const FS_BATCH_SIZE = 400; // Firestore batch limit is 500, keep margin
+const FS_BATCH_SIZE = 400;
 
 const fsLoad = async (uid, collName) => {
   if (!fbDb || !uid) return null;
@@ -39,7 +39,6 @@ const fsLoad = async (uid, collName) => {
 const fsSaveAll = async (uid, collName, rows) => {
   if (!fbDb || !uid) return false;
   try {
-    // Delete existing docs first in batches
     const existing = await getDocs(collection(fbDb, "users", uid, collName));
     const delBatches = [];
     let b = writeBatch(fbDb); let cnt = 0;
@@ -50,10 +49,9 @@ const fsSaveAll = async (uid, collName, rows) => {
     if (cnt > 0) delBatches.push(b.commit());
     await Promise.all(delBatches);
 
-    // Write new docs in batches
     const writeBatches = [];
     let wb = writeBatch(fbDb); let wCnt = 0;
-    rows.forEach((row, i) => {
+    rows.forEach((row) => {
       const ref = doc(collection(fbDb, "users", uid, collName));
       const clean = Object.fromEntries(Object.entries(row).filter(([k]) => k !== "_fsId"));
       wb.set(ref, clean); wCnt++;
@@ -661,11 +659,9 @@ const ImportPage=({t,setPolicies,uid})=>{
     const mapped=mapRows(rawRows,colMap);
     if(!mapped.length){setStatus({type:"error",msg:"❌ Koi valid row nahi mili."});setImporting(false);return;}
 
-    // Show progress
     const total=mapped.length;
     setStatus({type:"loading",msg:`⏳ ${total} rows import ho rahi hain...`});
 
-    // Process in chunks for UI responsiveness
     const CHUNK=500;
     let allDone=[];
     for(let i=0;i<mapped.length;i+=CHUNK){
@@ -899,7 +895,6 @@ export default function App(){
   const [synced,setSynced]=useState(false);
   const t=T(dark);
 
-  // Load from Firestore when Google user logs in
   useEffect(()=>{
     if(!session?.uid||!fbDb) return;
     fsLoad(session.uid,"policies").then(rows=>{
